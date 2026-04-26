@@ -34,22 +34,26 @@ Email: president@thenewworldfoundation.com}}
 
 % ---------------------------------------------------------------------------
 \begin{abstract}
-Large language model (LLM) agents fail in a distinctive way: they produce
-\emph{confident wrong answers}. Recent work has begun adapting Byzantine
-fault tolerance (BFT) to multi-LLM networks --- notably the weighted-BFT
-protocol of Wang \emph{et al.}~\cite{wang2025wbft} and the Aegean
-consensus engine~\cite{aegean2025} --- by treating each agent as a voter
-whose weight tracks its track record. We refine this line of work along
-three axes. First, we replace scalar trust scores with a
-\emph{defeasible-logic} verification primitive: rejection requires a
-constructed counter-proof, not merely a low confidence vote. Second, we
-gate the hard veto on reputation, so previously-faulty agents lose veto
-power but retain voice. Third, we accompany the protocol with a
-mechanically checked property suite that encodes the safety, liveness,
-and monotonicity claims of the paper as executable theorems. We call
-the resulting protocol \mbft{} (Metacognitive BFT) and provide a small,
-open-source reference implementation. The contribution is positional
-and refining rather than foundational, and we say so explicitly.
+Large language model (LLM) agents fail in a distinctive way: they
+produce \emph{confident wrong answers}. Recent work has begun adapting
+Byzantine fault tolerance (BFT) to multi-LLM networks --- notably the
+weighted-BFT protocol of Wang \emph{et al.}~\cite{wang2025wbft} and the
+Aegean consensus engine~\cite{aegean2025} --- typically by treating
+agent trust as a scalar that flows continuously through the protocol.
+\textbf{This paper takes the opposite stance: discretisation is a
+feature, not a bug.} \mbft{} (Metacognitive BFT) commits a swarm
+decision via a small, finite ladder of confidence tiers, defeasible
+counter-proofs, and a reputation-gated veto. The resulting protocol is
+auditable, deterministically replayable, and its safety / liveness
+claims are mechanically checkable --- properties that continuous
+Bayesian aggregators struggle to provide. Bayesian and continuous-trust
+schemes remain the right tool for noisy, well-calibrated, high-volume
+regimes (recommender systems, sensor fusion, market making); we argue
+that high-stakes reasoning swarms --- legal, medical, safety-critical
+agentic deployments --- belong to the discrete, defeasible regime that
+\mbft{} formalises. We accompany the paper with an open-source
+reference implementation whose property suite encodes each theorem as
+an executable test.
 \end{abstract}
 
 % ---------------------------------------------------------------------------
@@ -62,37 +66,81 @@ consensus protocols such as Paxos~\cite{lamport1998paxos} and
 Raft~\cite{ongaro2014raft} assume that any node which responds is
 truthful, an assumption that does not survive contact with hallucinating
 agents. We argue that hallucination is a \emph{Byzantine} fault and that
-the appropriate response is a consensus layer whose semantics are tied to
-agents' \emph{metacognitive} state rather than to bit-level log
+the appropriate response is a consensus layer whose semantics are tied
+to agents' \emph{metacognitive} state rather than to bit-level log
 agreement.
 
+\subsection*{Design stance: discretisation is the thesis}
+The recent weighted-BFT-for-LLMs line~\cite{wang2025wbft, aegean2025}
+treats agent trust as a continuous scalar threaded through the
+protocol. \mbft{} deliberately departs from that choice. Each agent's
+metacognitive state is reported on a small, finite ladder of tiers
+(e.g.~$\{\text{Low}, \text{Medium}, \text{High}\}$ or a bucketised
+$[0,1]$); rejection requires a constructed counter-proof, not a noisy
+scalar dip; commit is defined by a discrete predicate over those tiers
+and over a reputation-slashing rule.
+
+This is not a concession to engineering convenience --- it is the
+central design choice the paper defends. Discretisation buys five
+properties that high-stakes reasoning deployments need and that
+continuous Bayesian aggregators struggle to deliver:
+\begin{enumerate}
+  \item \emph{Auditability.} A commit can be replayed and inspected as
+        a finite proof tree rather than a posterior trajectory.
+  \item \emph{Determinism.} Identical agent reports always yield
+        identical commits; no Monte-Carlo variance.
+  \item \emph{Mechanical verifiability.} Safety and liveness become
+        finite case analyses, encodable as property tests
+        (Sec.~\ref{sec:guarantees},~\ref{sec:implementation}).
+  \item \emph{Adversarial robustness without calibration assumptions.}
+        Continuous schemes silently amplify miscalibrated overconfidence;
+        a defeasible counter-proof either exists or it does not.
+  \item \emph{Regulatory legibility.} A discrete commit rule with a
+        named reputation history maps cleanly onto post-hoc audit
+        regimes (medical, legal, financial, safety-critical).
+\end{enumerate}
+
+\subsection*{When the Bayesian regime is the right one}
+We do not claim discretisation dominates universally. Continuous,
+Bayesian, or stake-weighted aggregators remain the appropriate tool in
+domains where (i) reports arrive at high volume, (ii) calibration is
+empirically known and stable, and (iii) decisions are individually
+low-stakes and amortised over many trials. Recommender ensembles,
+sensor fusion, online ad allocation, and market-making swarms sit
+naturally in that regime. We sketch a Bayesian variant of \mbft{} in
+Sec.~\ref{sec:future} for exactly those settings, and ship its
+reference implementation alongside the discrete protocol. The two are
+complementary, not competing.
+
 \subsection*{Contributions and scope}
-We position this work as a \emph{refinement} of the recent
-weighted-BFT-for-LLMs line of research, not as a foundational
-proposal. Our contributions are:
+We position this work as a \emph{refinement and rephrasing} of the
+recent weighted-BFT-for-LLMs line of research, with discretisation as
+the organising principle. Our contributions are:
 \begin{itemize}
+  \item A discrete, tier-based formulation of metacognitive BFT
+        designed for auditable, high-stakes reasoning swarms
+        (Sec.~\ref{sec:protocol}).
   \item A defeasible-logic verification primitive that requires a
         constructed counter-proof for rejection, in contrast to scalar
-        trust scores used by WBFT~\cite{wang2025wbft} and quality
-        signals used by Aegean~\cite{aegean2025}
-        (Sec.~\ref{sec:protocol}).
+        trust scores~\cite{wang2025wbft} or quality
+        signals~\cite{aegean2025}.
   \item A reputation-gated veto: only un-slashed agents can block
         commit, so previously-faulty agents retain voice but not
-        unilateral blocking power (Sec.~\ref{sec:protocol}).
+        unilateral blocking power.
   \item Safety, liveness, and slashing-monotonicity propositions with
-        sketch proofs (Sec.~\ref{sec:guarantees}), each one encoded as
-        a parameterised property test in the companion repository
+        sketch proofs (Sec.~\ref{sec:guarantees}), each encoded as a
+        parameterised property test in the companion repository
         (Sec.~\ref{sec:implementation}).
-  \item A Bayesian generalisation (Sec.~\ref{sec:future}) showing how
-        the discrete logical commit rule can be relaxed to continuous
-        belief updating with a Bayes-factor margin.
+  \item A complementary Bayesian generalisation
+        (Sec.~\ref{sec:future}) intended for the high-volume,
+        well-calibrated, low-stakes regime --- not as a successor to
+        the discrete protocol but as its sibling.
 \end{itemize}
 What we do \emph{not} claim: novelty of weighted BFT for LLM swarms
 (established by~\cite{wang2025wbft, aegean2025}); novelty of multi-agent
-debate as a hallucination mitigation
-(\cite{du2023debate, liang2023encouraging}); or novelty of
-confidence-weighted aggregation broadly
-(\cite{wang2022selfconsistency}).
+debate as a hallucination mitigation~\cite{du2023debate,
+liang2023encouraging}; or novelty of confidence-weighted aggregation
+broadly~\cite{wang2022selfconsistency}.
 
 % ---------------------------------------------------------------------------
 \section{Background and Related Work}
@@ -266,10 +314,15 @@ $ pytest -q
 \section{Discussion and Future Work}
 \label{sec:future}
 
-\paragraph*{Bayesian generalisation.}
-The discretisation in Eq.~\eqref{eq:vote} is conservative. We sketch a
-Bayesian variant in which each report
-$(S_i, \tauconf_i)$ is a likelihood signal:
+\paragraph*{The Bayesian sibling, and where it belongs.}
+The discretisation defended in Sec.~\ref{sec:intro} is the right
+default for high-stakes reasoning swarms, but it is not the only
+useful regime. For domains with high report volume, empirically
+stable calibration, and low individual stakes --- recommender
+ensembles, sensor fusion, online bidding, market making --- a
+continuous Bayesian aggregator is more natural and more sample
+efficient. We sketch such a variant here. Each report
+$(S_i, \tauconf_i)$ becomes a likelihood signal:
 \[
 P(\text{report}_i \mid h) =
 \begin{cases}
@@ -279,25 +332,34 @@ P(\text{report}_i \mid h) =
 \]
 with reputation acting as a tempering exponent. Commit requires both a
 posterior-mass threshold and a Bayes-factor margin. A reference
-implementation lives in \texttt{src/core/protocol\_bayesian.py}.
+implementation lives in \texttt{src/core/protocol\_bayesian.py}. We
+emphasise that this variant is a \emph{sibling}, not a successor: the
+two protocols target different regimes and the discrete \mbft{} commit
+rule is what we defend for reasoning-critical deployments.
 
 \paragraph*{Open problems.}
-(i) Calibration of $\tauconf$ from raw token log-probabilities;
+(i) Calibration of $\tauconf$ from raw token log-probabilities ---
+acute for the Bayesian sibling, less so for the discrete tiered form;
 (ii) modelling correlated agent errors that violate the independence
 assumption of the Bayesian variant;
 (iii) pipelined view changes, in the spirit of HotStuff, to amortise
-the cost of leader rotation.
+the cost of leader rotation;
+(iv) a head-to-head empirical comparison against
+WBFT~\cite{wang2025wbft} and Aegean~\cite{aegean2025} on a
+reasoning-heavy benchmark.
 
 % ---------------------------------------------------------------------------
 \section{Conclusion}
 \label{sec:conclusion}
-\mbft{} sharpens the recent weighted-BFT-for-LLMs line of work
-\cite{wang2025wbft, aegean2025} along three small but defensible
-axes: defeasible-logic verification, reputation-gated veto, and a
-mechanically checked property suite. The contribution is a refinement,
-not a paradigm shift; an empirical head-to-head against
-\cite{wang2025wbft, aegean2025} is the most pressing item of future
-work.
+\mbft{} stakes out a deliberately discrete, tier-based corner of the
+weighted-BFT-for-LLMs design space~\cite{wang2025wbft, aegean2025}.
+The wager is that auditability, determinism, and mechanical
+verifiability matter more than continuous calibration in the domains
+where consensus on machine reasoning will actually be deployed under
+scrutiny --- legal, medical, financial, safety-critical. Where those
+constraints relax, the Bayesian sibling sketched in
+Sec.~\ref{sec:future} is the right tool. The two protocols partition
+the space; neither subsumes the other.
 
 % ---------------------------------------------------------------------------
 \bibliographystyle{IEEEtran}
