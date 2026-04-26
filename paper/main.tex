@@ -134,10 +134,11 @@ V_i(S_L) =
 
 \paragraph*{Confidence-Weighted Finality.}
 \begin{equation}
+\begin{aligned}
 \mathrm{Commit}(S_L) \iff
-\Bigl(\textstyle\sum_{i=1}^{n} V_i(S_L) \ge \thetameta\Bigr)
-\;\wedge\;
-\bigl(\nexists\, i \colon V_i < 0 \wedge \rho_i = 1\bigr).
+&\Bigl(\textstyle\sum_{i=1}^{n} V_i(S_L) \ge \thetameta\Bigr) \\
+&\wedge\;\bigl(\nexists\, i \colon V_i < 0 \wedge \rho_i = 1\bigr).
+\end{aligned}
 \label{eq:commit}
 \end{equation}
 
