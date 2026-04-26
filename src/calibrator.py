@@ -151,37 +151,64 @@ class CalibrationReport:
 def compute_calibration(
     records: List[TrialRecord], n_bins: int = 10
 ) -> Tuple[List[CalibrationBin], float, float, float]:
-    """Compute binned calibration, ECE, MCE, and Brier score."""
-    bins: List[CalibrationBin] = []
-    bin_width = 1.0 / n_bins
+    """Compute binned calibration, ECE, MCE, and Brier score.
 
+    Uses a single pass over *records* to bucket by confidence, accumulate
+    per-bin sums, and compute the Brier score simultaneously — O(N + B)
+    instead of the previous O(N × B) approach that re-scanned all records
+    for every bin.
+    """
+    total = len(records)
+    if total == 0:
+        bins = [
+            CalibrationBin(i / n_bins, (i + 1) / n_bins, (i + 0.5) / n_bins, 0.0, 0)
+            for i in range(n_bins)
+        ]
+        return bins, 0.0, 0.0, 0.0
+
+    inv_width = float(n_bins)  # 1.0 / bin_width
+    last_bin = n_bins - 1
+
+    # Per-bin accumulators: count, sum of confidences, count of correct
+    bin_count = [0] * n_bins
+    bin_conf_sum = [0.0] * n_bins
+    bin_correct = [0] * n_bins
+
+    total_brier = 0.0
+
+    for r in records:
+        # Determine bin index in O(1) via arithmetic
+        idx = int(r.confidence * inv_width)
+        if idx >= n_bins:       # confidence == 1.0 edge case
+            idx = last_bin
+        bin_count[idx] += 1
+        bin_conf_sum[idx] += r.confidence
+        if r.is_correct:
+            bin_correct[idx] += 1
+        total_brier += (r.confidence - (1.0 if r.is_correct else 0.0)) ** 2
+
+    # Build CalibrationBin list and aggregate ECE / MCE
+    bins: List[CalibrationBin] = []
     total_ece = 0.0
     max_ce = 0.0
-    total_brier = 0.0
-    total = len(records)
+    bin_width = 1.0 / n_bins
 
     for i in range(n_bins):
         lo = i * bin_width
         hi = lo + bin_width
-        in_bin = [r for r in records if lo <= r.confidence < hi or (i == n_bins - 1 and r.confidence == 1.0 and lo <= r.confidence <= hi)]
-
-        if not in_bin:
+        cnt = bin_count[i]
+        if cnt == 0:
             bins.append(CalibrationBin(lo, hi, (lo + hi) / 2, 0.0, 0))
             continue
-
-        mean_conf = statistics.mean(r.confidence for r in in_bin)
-        acc = sum(1 for r in in_bin if r.is_correct) / len(in_bin)
+        mean_conf = bin_conf_sum[i] / cnt
+        acc = bin_correct[i] / cnt
         ce = abs(acc - mean_conf)
-
-        bins.append(CalibrationBin(lo, hi, mean_conf, acc, len(in_bin)))
-        total_ece += ce * len(in_bin)
+        bins.append(CalibrationBin(lo, hi, mean_conf, acc, cnt))
+        total_ece += ce * cnt
         max_ce = max(max_ce, ce)
 
-    for r in records:
-        total_brier += (r.confidence - (1.0 if r.is_correct else 0.0)) ** 2
-
-    ece = total_ece / total if total > 0 else 0.0
-    brier = total_brier / total if total > 0 else 0.0
+    ece = total_ece / total
+    brier = total_brier / total
 
     return bins, ece, max_ce, brier
 
@@ -191,14 +218,36 @@ def diagnose_agent(
     ece: float, mce: float, brier: float,
 ) -> AgentCalibration:
     """Produce per-agent diagnosis and recommendations."""
-    accuracy = sum(1 for r in records if r.is_correct) / len(records) if records else 0
-    mean_conf = statistics.mean(r.confidence for r in records) if records else 0
+    if not records:
+        return AgentCalibration(
+            agent_id=agent_id, bins=bins, ece=ece, mce=mce, brier=brier,
+            accuracy=0, mean_confidence=0, overconfidence_ratio=0,
+            underconfidence_ratio=0, diagnosis="no-data",
+            recommendations=["No data."],
+        )
 
-    # Count overconfident trials (confidence > bin accuracy)
-    over = sum(1 for r in records if r.confidence > accuracy + 0.1)
-    under = sum(1 for r in records if r.confidence < accuracy - 0.1)
-    over_ratio = over / len(records) if records else 0
-    under_ratio = under / len(records) if records else 0
+    n = len(records)
+    correct_count = 0
+    conf_sum = 0.0
+    for r in records:
+        conf_sum += r.confidence
+        if r.is_correct:
+            correct_count += 1
+    accuracy = correct_count / n
+    mean_conf = conf_sum / n
+
+    # Count overconfident / underconfident trials in single pass
+    over_thresh = accuracy + 0.1
+    under_thresh = accuracy - 0.1
+    over = 0
+    under = 0
+    for r in records:
+        if r.confidence > over_thresh:
+            over += 1
+        elif r.confidence < under_thresh:
+            under += 1
+    over_ratio = over / n
+    under_ratio = under / n
 
     recs: List[str] = []
     diagnosis = "well-calibrated"
