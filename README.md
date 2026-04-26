@@ -1,5 +1,7 @@
 # mBFT — Metacognitive Byzantine Fault Tolerance
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Reference implementation for the paper **"Consensus-Driven Metacognition in
 Multi-Agent Systems."** mBFT is a semantic-consensus protocol for swarms of
 LLM-style agents that combines Byzantine Fault Tolerance with defeasible,
