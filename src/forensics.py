@@ -138,31 +138,50 @@ class ForensicsAnalyzer:
         self.report.agent_profiles = profiles
 
     def _compute_agreement_matrix(self) -> None:
-        """Pairwise agreement rate between all voting agents."""
-        # Collect per-round vote decisions (accept/reject) per agent
-        round_decisions: List[Dict[str, bool]] = []
-        for rr in self.history:
-            decisions: Dict[str, bool] = {}
-            for v in rr.votes:
-                decisions[v.voter_id] = not v.is_rejection
-            round_decisions.append(decisions)
+        """Pairwise agreement rate between all voting agents.
 
+        Uses a single O(R × V²) pass over rounds instead of the previous
+        O(A² × R) triple-nested loop.  For each round we iterate voter
+        pairs once and accumulate agree/total counts directly, which also
+        improves cache locality when A (total agents) is large.
+        """
+        # Accumulate pairwise agree/total in a single pass over rounds.
+        # Keys are (min_id, max_id) to avoid storing both directions.
+        pair_agree: Dict[Tuple[str, str], int] = defaultdict(int)
+        pair_total: Dict[Tuple[str, str], int] = defaultdict(int)
+
+        for rr in self.history:
+            # Build per-round voter list with decisions
+            voters: List[Tuple[str, bool]] = [
+                (v.voter_id, not v.is_rejection) for v in rr.votes
+            ]
+            n = len(voters)
+            for i in range(n):
+                a_id, a_dec = voters[i]
+                for j in range(i + 1, n):
+                    b_id, b_dec = voters[j]
+                    key = (a_id, b_id) if a_id < b_id else (b_id, a_id)
+                    pair_total[key] += 1
+                    if a_dec == b_dec:
+                        pair_agree[key] += 1
+
+        # Build symmetric matrix from accumulated counts
         agents = sorted(self.report.agent_profiles.keys())
         matrix: Dict[str, Dict[str, float]] = {}
         for a in agents:
-            matrix[a] = {}
+            matrix[a] = {a: 1.0}
+
+        for (a, b), total in pair_total.items():
+            rate = pair_agree.get((a, b), 0) / total
+            matrix.setdefault(a, {})[b] = rate
+            matrix.setdefault(b, {})[a] = rate
+
+        # Fill missing pairs (agents that never co-voted) with 0
+        for a in agents:
+            row = matrix[a]
             for b in agents:
-                if a == b:
-                    matrix[a][b] = 1.0
-                    continue
-                agree = 0
-                total = 0
-                for rd in round_decisions:
-                    if a in rd and b in rd:
-                        total += 1
-                        if rd[a] == rd[b]:
-                            agree += 1
-                matrix[a][b] = agree / max(total, 1)
+                if b not in row:
+                    row[b] = 0.0
 
         self.report.agreement_matrix = matrix
 
