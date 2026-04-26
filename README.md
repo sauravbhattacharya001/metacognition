@@ -2,57 +2,176 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Reference implementation for the paper **"Consensus-Driven Metacognition in
-Multi-Agent Systems."** mBFT is a semantic-consensus protocol for swarms of
-LLM-style agents that combines Byzantine Fault Tolerance with defeasible,
-epistemic-logic reasoning.
+**What if AI agents could know when they don't know?**
 
-## Why mBFT?
+mBFT is a consensus protocol for multi-agent AI systems that treats confident hallucinations as what they really are: **Byzantine faults.** Instead of trusting any single LLM's output, mBFT makes agents debate, verify each other's reasoning, and only commit when the group reaches genuine agreement.
 
-Classical CFT protocols (Paxos, Raft) assume a non-faulty node tells the truth.
-LLM agents violate that assumption: a confidently hallucinating agent is a
-Byzantine fault, not a crash. mBFT replaces flat node-counting with
-**confidence-weighted, defeasible voting** over logical proofs.
+> Think of it as "peer review for AI agents" — no answer gets through unless the swarm can back it up.
 
-## Protocol summary
+---
 
-For round `r` over agent set `A = {a_1 … a_n}`:
+## The Problem
 
-1. **Epistemic Leader Election** — `L_r = argmax_i τ_i(S_i)`
-2. **Semantic Verification** — each follower returns a vote
-   `V_i ∈ [-τ_i, τ_i]`; a valid counter-proof yields `V_i < 0`.
-3. **Confidence-Weighted Finality** —
-   `Commit(S_L) ⇔ (Σ V_i ≥ θ_meta) ∧ (min V_i ≥ 0)`
-4. On failure, the leader's weight is slashed and the counter-proposer leads
-   round `r+1`.
+A single LLM can't tell the difference between *knowing* something, *inferring* something, and *making something up*. It has no epistemic self-awareness. Ask it a question and it answers with the same confidence whether it's right or hallucinating.
 
-See `src/core/protocol.py` for the executable specification.
+Classical consensus protocols (Paxos, Raft) don't help — they assume a responding node tells the truth. But an LLM that confidently returns a wrong answer **is** a Byzantine fault, not a crash.
 
-## Layout
+## The Idea
+
+Put multiple agents in a room. Make them propose answers *with proofs*. Make them verify each other's proofs. Weight votes by calibrated confidence. Require consensus to commit.
+
+The result: **metacognition emerges from the protocol itself.** Disagreement becomes the system's version of doubt. Agreement becomes a real confidence signal. The "observer" isn't inside any single model — it lives in the space between them.
+
+## How It Works
+
+Each consensus round has three phases:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  1. PROPOSE  — Every agent generates a solution     │
+│                with a proof and confidence score     │
+│                                                     │
+│  2. VERIFY   — Agents review the leader's proof     │
+│                and vote: agree (+weight) or          │
+│                reject with counter-proof (-weight)   │
+│                                                     │
+│  3. COMMIT   — Solution commits only if:            │
+│                • Total weighted votes ≥ threshold    │
+│                • No unrefuted rejections             │
+│                                                     │
+│  On failure → leader's reputation is slashed,       │
+│               strongest dissenter leads next round   │
+└─────────────────────────────────────────────────────┘
+```
+
+**Key properties:**
+- **Confidence-weighted voting** — not all agents count equally; calibrated confidence matters
+- **Counter-proofs required** — you can't just say "no," you have to show why
+- **Reputation tracking** — agents that propose bad solutions lose influence over time
+- **Byzantine tolerance** — adversarial or hallucinating agents get naturally filtered out
+
+## Quick Start
+
+**No API keys needed** — the demo runs with mock agents out of the box.
+
+```bash
+# Clone and set up
+git clone https://github.com/sauravbhattacharya001/metacognition.git
+cd metacognition
+python -m venv .venv
+
+# Activate virtual environment
+# Linux/macOS:
+source .venv/bin/activate
+# Windows:
+.\.venv\Scripts\Activate.ps1
+
+# Install and run
+pip install -r requirements.txt
+python -m src.network.simulator
+```
+
+**Expected output:**
+```
+============================================================
+COMMITTED: '42'
+  leader: a1
+  Σ V_i: 2.270 >= θ=1.5
+reputation after run: {'a1': 1.0, 'a2': 1.0, 'a3': 1.0, 'a4': 1.0, 'a5': 1.0}
+rounds executed: 1
+```
+
+The demo swarm has 5 agents — 3 honest agents agreeing on "42", 1 dissenter, and 1 Byzantine (adversarial) agent. The protocol reaches consensus on the correct answer despite the noise.
+
+**Run the tests:**
+```bash
+pytest -q
+```
+
+## Using Real LLMs
+
+To plug in an actual language model, implement the `LLMClient` protocol and pass it to `MetacognitiveAgent`:
+
+```python
+from src.agents.metacognitive import MetacognitiveAgent
+from src.core.protocol import MBFTEngine
+
+class MyLLMClient:
+    async def complete(self, prompt: str) -> str:
+        # Call your LLM (OpenAI, Anthropic, local model, etc.)
+        # Must return JSON with: solution, proof, confidence
+        ...
+
+agents = [
+    MetacognitiveAgent("agent-1", llm=MyLLMClient()),
+    MetacognitiveAgent("agent-2", llm=MyLLMClient()),
+    MetacognitiveAgent("agent-3", llm=MyLLMClient()),
+]
+
+engine = MBFTEngine(agents=agents, threshold=1.5)
+result = await engine.run("What caused the 2008 financial crisis?")
+```
+
+**Tip:** Use diverse models (e.g., mix GPT-4, Claude, Gemini) — homogeneous agents may agree on the same mistakes, defeating the purpose.
+
+## Project Structure
 
 ```
 metacognition/
 ├── src/
-│   ├── core/            # State models + mBFT engine
-│   ├── agents/          # Base + metacognitive agent (mock + LLM)
-│   └── network/         # Asyncio simulator / message bus
-└── tests/               # Including Byzantine fault-injection tests
+│   ├── core/               # Protocol engine + state models
+│   │   ├── protocol.py     # MBFTEngine — the consensus loop
+│   │   └── state.py        # Proposal, Vote, RoundResult
+│   ├── agents/             # Agent implementations
+│   │   ├── base.py         # Abstract BaseAgent contract
+│   │   └── metacognitive.py # MockAgent + MetacognitiveAgent (LLM)
+│   ├── network/            # Async simulator
+│   ├── adversarial_trainer.py  # Red-team testing for agent swarms
+│   ├── calibrator.py       # Confidence calibration utilities
+│   ├── diversity.py        # Model diversity analysis
+│   ├── governance.py       # Governance policy enforcement
+│   ├── trust_tracker.py    # Long-term agent reputation tracking
+│   └── ...                 # Additional analysis modules
+├── tests/                  # Consensus + Byzantine fault-injection tests
+├── paper/                  # LaTeX source for the research paper
+└── docs/                   # MkDocs documentation site
 ```
 
-## Quick start
+## Key Concepts
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-pytest -q
-python -m src.network.simulator   # demo run with mock agents
-```
+| Term | What it means |
+|---|---|
+| **Proposal** | An agent's answer + logical proof + confidence score (τ ∈ [0,1]) |
+| **Vote** | A follower's weighted judgment on the leader's proposal (V ∈ [-1, 1]) |
+| **Counter-proof** | A logical refutation — required to cast a negative vote |
+| **Threshold (θ)** | Minimum aggregate weight needed to commit a solution |
+| **Reputation** | Multiplicative weight per agent; slashed on failed leadership |
+| **Byzantine agent** | An agent that lies, hallucinates, or acts adversarially |
 
-The default demo uses `MockAgent`, so no API key is required. To use a real
-LLM, implement an `LLMClient` and pass it to `MetacognitiveAgent`.
+## Research Paper
 
-## Status
+The accompanying paper — *"Consensus-Driven Metacognition in Multi-Agent Systems"* — formalizes the protocol and explores:
 
-Theoretical-framework reference impl. Future work: Bayesian belief updates,
-HotStuff-style pipelined view changes, calibration benchmarks.
+1. Can multi-agent disagreement approximate epistemic uncertainty?
+2. What consensus protocol best supports safe autonomous agency?
+3. Does model diversity improve the metacognitive signal?
+4. Can consensus serve as governance for autonomous AI agents?
+
+LaTeX source is in [`paper/`](paper/).
+
+## Contributing
+
+Contributions welcome! Some areas where help would be especially valuable:
+
+- **Bayesian belief update integration** — replacing flat confidence with posterior updates
+- **Benchmarks** — calibration tests across different LLM combinations
+- **HotStuff-style pipelining** — optimizing view changes for lower latency
+- **Real-world eval datasets** — testing mBFT on factual QA, reasoning, and code generation
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+---
+
+*Built by [Saurav Bhattacharya](https://github.com/sauravbhattacharya001) as part of research into AI agent governance and safety.*
