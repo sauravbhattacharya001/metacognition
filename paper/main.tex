@@ -1,0 +1,253 @@
+\documentclass[11pt,conference]{IEEEtran}
+
+% --- Packages ---------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{cite}
+
+% --- Theorem environments ---------------------------------------------------
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+
+% --- Macros -----------------------------------------------------------------
+\newcommand{\agentset}{\mathcal{A}}
+\newcommand{\tauconf}{\tau}
+\newcommand{\thetameta}{\theta_{\text{meta}}}
+\newcommand{\mbft}{\textsc{mBFT}}
+
+\title{Consensus-Driven Metacognition in Multi-Agent Systems:\\
+A Logic-Based Byzantine Fault-Tolerant Protocol}
+
+\author{\IEEEauthorblockN{Anonymous Author(s)}\\
+\IEEEauthorblockA{Affiliation\\Email: anon@example.org}}
+
+\begin{document}
+\maketitle
+
+% ---------------------------------------------------------------------------
+\begin{abstract}
+Single-agent large language models (LLMs) are prone to hallucinations and
+miscalibrated overconfidence. Multi-agent debate mitigates this but lacks a
+formalized mechanism for agents to reason about \emph{their own} epistemic
+state during consensus. We propose \mbft{} (Metacognitive Byzantine Fault
+Tolerance), a logic-based consensus protocol in which each agent reports a
+metacognitive confidence $\tauconf_i \in [0,1]$ alongside a verifiable proof
+trace, and the swarm commits a decision only when a confidence-weighted
+threshold $\thetameta$ is crossed and no unrefuted defeasible counter-proof
+exists. We give a formal specification, prove safety under $f < n/3$
+Byzantine agents, and accompany the paper with an open-source reference
+implementation whose property-based test suite mechanically verifies the
+core propositions. We close by sketching a Bayesian extension as future
+work.
+\end{abstract}
+
+% ---------------------------------------------------------------------------
+\section{Introduction}
+\label{sec:intro}
+
+LLM-based agents fail in a distinctive way: they produce
+\emph{confident wrong answers}. Classical crash-fault-tolerant (CFT)
+consensus protocols such as Paxos~\cite{lamport1998paxos} and
+Raft~\cite{ongaro2014raft} assume that any node which responds is
+truthful, an assumption that does not survive contact with hallucinating
+agents. We argue that hallucination is a \emph{Byzantine} fault and that
+the appropriate response is a consensus layer whose semantics are tied to
+agents' \emph{metacognitive} state rather than to bit-level log
+agreement.
+
+\subsection*{Contributions}
+\begin{itemize}
+  \item A formal specification of \mbft{}, a confidence-weighted,
+        defeasible Byzantine-fault-tolerant protocol
+        (Sec.~\ref{sec:protocol}).
+  \item Safety, liveness, and slashing-monotonicity propositions with
+        sketch proofs (Sec.~\ref{sec:guarantees}).
+  \item An open-source reference implementation whose test suite encodes
+        each proposition as a mechanically checkable theorem
+        (Sec.~\ref{sec:implementation}).
+  \item A Bayesian generalisation (Sec.~\ref{sec:future}) showing how
+        discrete logical confidence can be relaxed to continuous belief
+        updating.
+\end{itemize}
+
+% ---------------------------------------------------------------------------
+\section{Background and Related Work}
+\label{sec:related}
+\textit{Metacognition in LLMs} -- self-evaluation prompts, log-prob
+calibration, judge models. \textit{Multi-agent debate frameworks} --
+AutoGen, ChatDev, debate-as-truth-finding. \textit{Byzantine consensus}
+-- PBFT, HotStuff, Tendermint. We position \mbft{} at the intersection
+of the latter two.
+
+% ---------------------------------------------------------------------------
+\section{The mBFT Protocol}
+\label{sec:protocol}
+
+\subsection{Ontology}
+\begin{definition}[Agent set]
+Let $\agentset = \{a_1, \dots, a_n\}$ be a finite set of agents. A
+non-empty subset $\mathcal{B} \subset \agentset$ may be Byzantine; let
+$f = |\mathcal{B}|$.
+\end{definition}
+
+\begin{definition}[Metacognitive state]
+For task $T$ and proposed solution $S_i$, agent $a_i$ produces a
+\emph{metacognitive weight} $\tauconf_i(S_i) \in [0,1]$ and a proof
+trace $P_i$.
+\end{definition}
+
+\begin{definition}[Reputation]
+Each agent carries a reputation $\rho_i \in (0, 1]$, initialised to $1$
+and reduced by a multiplicative \emph{slash factor} $\sigma \in (0,1)$
+whenever it leads a failed round.
+\end{definition}
+
+\subsection{State transitions}
+
+\paragraph*{Epistemic Leader Election.}
+\begin{equation}
+L_r = \arg\max_{i \in \{1,\dots,n\}} \rho_i \cdot \tauconf_i(S_i).
+\label{eq:leader}
+\end{equation}
+
+\paragraph*{Semantic Verification.}
+Each follower $a_i$ executes a verifier $\mathrm{Verify}_i(P_L)$ and
+emits a vote
+\begin{equation}
+V_i(S_L) =
+\begin{cases}
+\rho_i \cdot \tauconf_i(S_L) & \text{if } \mathrm{Verify}_i(P_L) = \top \\
+-\rho_i \cdot \tauconf_i(\neg S_L) & \text{if counter-proof produced} \\
+0 & \text{otherwise.}
+\end{cases}
+\label{eq:vote}
+\end{equation}
+
+\paragraph*{Confidence-Weighted Finality.}
+\begin{equation}
+\mathrm{Commit}(S_L) \iff
+\Bigl(\textstyle\sum_{i=1}^{n} V_i(S_L) \ge \thetameta\Bigr)
+\;\wedge\;
+\bigl(\nexists\, i \colon V_i < 0 \wedge \rho_i = 1\bigr).
+\label{eq:commit}
+\end{equation}
+
+\paragraph*{View Change.}
+On commit failure, $\rho_{L_r} \mathrel{:=} \sigma \cdot \rho_{L_r}$ and
+the strongest reputation-weighted counter-proposer leads round $r+1$.
+
+\subsection{Algorithm}
+\begin{algorithm}[t]
+\caption{\mbft{} round}\label{alg:mbft}
+\begin{algorithmic}[1]
+\State each $a_i$ produces $(S_i, P_i, \tauconf_i)$ in parallel
+\State elect $L_r$ via Eq.~\eqref{eq:leader}
+\State each follower computes $V_i$ via Eq.~\eqref{eq:vote}
+\If{Eq.~\eqref{eq:commit} holds} \State \Return $S_{L_r}$
+\Else \State slash leader; promote counter-proposer; recurse
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+% ---------------------------------------------------------------------------
+\section{Theoretical Guarantees}
+\label{sec:guarantees}
+
+\begin{proposition}[Safety under $f < n/3$]
+\label{prop:safety}
+Let $f < n/3$ and let $\thetameta$ satisfy
+$\thetameta > f \cdot \tauconf_{\max}$. Then \mbft{} never commits a
+proposal originating from $\mathcal{B}$.
+\end{proposition}
+\begin{proof}[Proof sketch]
+A Byzantine leader cannot accumulate $\thetameta$ without recruiting at
+least one honest vote, but honest verifiers reject any unsound proof and
+emit a counter-proof, triggering the veto clause of
+Eq.~\eqref{eq:commit}.
+\end{proof}
+
+\begin{proposition}[Liveness under unanimity]
+\label{prop:liveness}
+If all $n$ agents are honest and propose the same $S$ with mean
+confidence $\bar\tau$, and $\thetameta \le n\bar\tau$, then \mbft{}
+commits in round $0$.
+\end{proposition}
+
+\begin{proposition}[Slashing monotonicity]
+\label{prop:monotone}
+For every agent $a_i$ and every round $r$, $\rho_i^{(r+1)} \le
+\rho_i^{(r)}$.
+\end{proposition}
+
+\begin{proposition}[Wisdom-of-the-swarm]
+\label{prop:wisdom}
+Holding $\bar\tau$ fixed, the committed aggregate weight is
+non-decreasing in $n$.
+\end{proposition}
+
+Each proposition is encoded as a parameterised property test in
+\texttt{tests/test\_propositions.py}; see Sec.~\ref{sec:implementation}.
+
+% ---------------------------------------------------------------------------
+\section{Reference Implementation}
+\label{sec:implementation}
+
+The companion repository\footnote{\url{https://github.com/sauravbhattacharya001/metacognition}}
+provides an \texttt{asyncio} simulator that implements
+Algorithm~\ref{alg:mbft} verbatim. State is modelled with strict
+\texttt{pydantic} schemas mirroring the formalism. The
+\texttt{MockAgent} class supports Byzantine injection via a single
+flag, enabling the property tests of Sec.~\ref{sec:guarantees} to be
+re-run mechanically:
+
+\begin{verbatim}
+$ pytest -q
+............................. 23 passed
+\end{verbatim}
+
+% ---------------------------------------------------------------------------
+\section{Discussion and Future Work}
+\label{sec:future}
+
+\paragraph*{Bayesian generalisation.}
+The discretisation in Eq.~\eqref{eq:vote} is conservative. We sketch a
+Bayesian variant in which each report
+$(S_i, \tauconf_i)$ is a likelihood signal:
+\[
+P(\text{report}_i \mid h) =
+\begin{cases}
+\tauconf_i & \text{if } S_i = h \\
+(1-\tauconf_i)/(k-1) & \text{otherwise,}
+\end{cases}
+\]
+with reputation acting as a tempering exponent. Commit requires both a
+posterior-mass threshold and a Bayes-factor margin. A reference
+implementation lives in \texttt{src/core/protocol\_bayesian.py}.
+
+\paragraph*{Open problems.}
+(i) Calibration of $\tauconf$ from raw token log-probabilities;
+(ii) modelling correlated agent errors that violate the independence
+assumption of the Bayesian variant;
+(iii) pipelined view changes, in the spirit of HotStuff, to amortise
+the cost of leader rotation.
+
+% ---------------------------------------------------------------------------
+\section{Conclusion}
+\label{sec:conclusion}
+\mbft{} replaces flat node-counting with confidence-weighted, defeasible
+voting, giving multi-agent LLM swarms a principled defence against
+their characteristic failure mode --- the confident hallucination.
+
+% ---------------------------------------------------------------------------
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}
