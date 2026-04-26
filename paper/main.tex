@@ -4,7 +4,6 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb,amsthm}
-\usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{graphicx}
 \usepackage{hyperref}
@@ -35,19 +34,22 @@ Email: president@thenewworldfoundation.com}}
 
 % ---------------------------------------------------------------------------
 \begin{abstract}
-Single-agent large language models (LLMs) are prone to hallucinations and
-miscalibrated overconfidence. Multi-agent debate mitigates this but lacks a
-formalized mechanism for agents to reason about \emph{their own} epistemic
-state during consensus. We propose \mbft{} (Metacognitive Byzantine Fault
-Tolerance), a logic-based consensus protocol in which each agent reports a
-metacognitive confidence $\tauconf_i \in [0,1]$ alongside a verifiable proof
-trace, and the swarm commits a decision only when a confidence-weighted
-threshold $\thetameta$ is crossed and no unrefuted defeasible counter-proof
-exists. We give a formal specification, prove safety under $f < n/3$
-Byzantine agents, and accompany the paper with an open-source reference
-implementation whose property-based test suite mechanically verifies the
-core propositions. We close by sketching a Bayesian extension as future
-work.
+Large language model (LLM) agents fail in a distinctive way: they produce
+\emph{confident wrong answers}. Recent work has begun adapting Byzantine
+fault tolerance (BFT) to multi-LLM networks --- notably the weighted-BFT
+protocol of Wang \emph{et al.}~\cite{wang2025wbft} and the Aegean
+consensus engine~\cite{aegean2025} --- by treating each agent as a voter
+whose weight tracks its track record. We refine this line of work along
+three axes. First, we replace scalar trust scores with a
+\emph{defeasible-logic} verification primitive: rejection requires a
+constructed counter-proof, not merely a low confidence vote. Second, we
+gate the hard veto on reputation, so previously-faulty agents lose veto
+power but retain voice. Third, we accompany the protocol with a
+mechanically checked property suite that encodes the safety, liveness,
+and monotonicity claims of the paper as executable theorems. We call
+the resulting protocol \mbft{} (Metacognitive BFT) and provide a small,
+open-source reference implementation. The contribution is positional
+and refining rather than foundational, and we say so explicitly.
 \end{abstract}
 
 % ---------------------------------------------------------------------------
@@ -64,29 +66,70 @@ the appropriate response is a consensus layer whose semantics are tied to
 agents' \emph{metacognitive} state rather than to bit-level log
 agreement.
 
-\subsection*{Contributions}
+\subsection*{Contributions and scope}
+We position this work as a \emph{refinement} of the recent
+weighted-BFT-for-LLMs line of research, not as a foundational
+proposal. Our contributions are:
 \begin{itemize}
-  \item A formal specification of \mbft{}, a confidence-weighted,
-        defeasible Byzantine-fault-tolerant protocol
+  \item A defeasible-logic verification primitive that requires a
+        constructed counter-proof for rejection, in contrast to scalar
+        trust scores used by WBFT~\cite{wang2025wbft} and quality
+        signals used by Aegean~\cite{aegean2025}
         (Sec.~\ref{sec:protocol}).
+  \item A reputation-gated veto: only un-slashed agents can block
+        commit, so previously-faulty agents retain voice but not
+        unilateral blocking power (Sec.~\ref{sec:protocol}).
   \item Safety, liveness, and slashing-monotonicity propositions with
-        sketch proofs (Sec.~\ref{sec:guarantees}).
-  \item An open-source reference implementation whose test suite encodes
-        each proposition as a mechanically checkable theorem
+        sketch proofs (Sec.~\ref{sec:guarantees}), each one encoded as
+        a parameterised property test in the companion repository
         (Sec.~\ref{sec:implementation}).
   \item A Bayesian generalisation (Sec.~\ref{sec:future}) showing how
-        discrete logical confidence can be relaxed to continuous belief
-        updating.
+        the discrete logical commit rule can be relaxed to continuous
+        belief updating with a Bayes-factor margin.
 \end{itemize}
+What we do \emph{not} claim: novelty of weighted BFT for LLM swarms
+(established by~\cite{wang2025wbft, aegean2025}); novelty of multi-agent
+debate as a hallucination mitigation
+(\cite{du2023debate, liang2023encouraging}); or novelty of
+confidence-weighted aggregation broadly
+(\cite{wang2022selfconsistency}).
 
 % ---------------------------------------------------------------------------
 \section{Background and Related Work}
 \label{sec:related}
-\textit{Metacognition in LLMs} -- self-evaluation prompts, log-prob
-calibration, judge models. \textit{Multi-agent debate frameworks} --
-AutoGen, ChatDev, debate-as-truth-finding. \textit{Byzantine consensus}
--- PBFT, HotStuff, Tendermint. We position \mbft{} at the intersection
-of the latter two.
+
+\subsection{Multi-agent debate and self-consistency}
+Multi-agent debate frameworks~\cite{du2023debate, liang2023encouraging}
+and self-consistency decoding~\cite{wang2022selfconsistency} aggregate
+multiple LLM samples to reduce hallucination, typically via majority
+vote or judge-model adjudication. These works do not model Byzantine
+faults explicitly and treat all agents as honest-but-noisy.
+
+\subsection{Byzantine consensus for LLM swarms}
+The closest prior work to ours is the Weighted BFT protocol of Wang
+\emph{et al.}~\cite{wang2025wbft}, which adapts PBFT-style consensus
+to multi-LLM networks with \emph{dynamically adjusted voting weights}
+keyed to historical response quality. Aegean~\cite{aegean2025} ships
+a production BFT engine for multi-agent LLM systems with adaptive
+quorum detection and AutoGen integration. Both treat agent trust as a
+scalar; both use vote-counting (weighted or unweighted) as the
+verification primitive.
+
+\subsection{Classical consensus}
+Paxos~\cite{lamport1998paxos} and Raft~\cite{ongaro2014raft} are
+crash-fault-tolerant and assume any responding node is truthful, an
+assumption violated by hallucinating LLMs. PBFT~\cite{castro1999pbft}
+and HotStuff~\cite{yin2019hotstuff} provide Byzantine guarantees but
+operate over bit-level state rather than over reasoning artefacts.
+
+\subsection{Where \mbft{} sits}
+\mbft{} is best understood as a logic-flavoured refinement of
+\cite{wang2025wbft}. The novel mechanisms are (i) a defeasible-proof
+verification step in place of a scalar quality signal, (ii) a
+reputation-gated veto rule, and (iii) a mechanically checked property
+suite shipped with the paper. We do not benchmark against
+\cite{wang2025wbft, aegean2025}; a head-to-head empirical comparison
+is the obvious next step and is left as future work.
 
 % ---------------------------------------------------------------------------
 \section{The mBFT Protocol}
@@ -147,8 +190,10 @@ On commit failure, $\rho_{L_r} \mathrel{:=} \sigma \cdot \rho_{L_r}$ and
 the strongest reputation-weighted counter-proposer leads round $r+1$.
 
 \subsection{Algorithm}
-\begin{algorithm}[t]
-\caption{\mbft{} round}\label{alg:mbft}
+\begin{figure}[t]
+\hrule\vspace{2pt}
+\textbf{Algorithm 1: \mbft{} round}\\[-4pt]
+\hrule\vspace{4pt}
 \begin{algorithmic}[1]
 \State each $a_i$ produces $(S_i, P_i, \tauconf_i)$ in parallel
 \State elect $L_r$ via Eq.~\eqref{eq:leader}
@@ -157,7 +202,9 @@ the strongest reputation-weighted counter-proposer leads round $r+1$.
 \Else \State slash leader; promote counter-proposer; recurse
 \EndIf
 \end{algorithmic}
-\end{algorithm}
+\vspace{2pt}\hrule
+\label{alg:mbft}
+\end{figure}
 
 % ---------------------------------------------------------------------------
 \section{Theoretical Guarantees}
@@ -244,9 +291,13 @@ the cost of leader rotation.
 % ---------------------------------------------------------------------------
 \section{Conclusion}
 \label{sec:conclusion}
-\mbft{} replaces flat node-counting with confidence-weighted, defeasible
-voting, giving multi-agent LLM swarms a principled defence against
-their characteristic failure mode --- the confident hallucination.
+\mbft{} sharpens the recent weighted-BFT-for-LLMs line of work
+\cite{wang2025wbft, aegean2025} along three small but defensible
+axes: defeasible-logic verification, reputation-gated veto, and a
+mechanically checked property suite. The contribution is a refinement,
+not a paradigm shift; an empirical head-to-head against
+\cite{wang2025wbft, aegean2025} is the most pressing item of future
+work.
 
 % ---------------------------------------------------------------------------
 \bibliographystyle{IEEEtran}
