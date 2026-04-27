@@ -303,11 +303,13 @@ async def run_economy(
                 market.subsidy_pool += tax
                 a.history.append({"round": r, "won": True, "invested": investments[a.agent_id], "return": net})
         else:
-            # Failed round — partial loss
+            # Failed round — partial loss (refund half the investment)
             for a in agents:
-                loss = investments[a.agent_id] * 0.5  # lose half investment
+                invested = investments[a.agent_id]
+                refund = invested * 0.5  # get half back
+                a.budget += refund
                 a.losses += 1
-                a.history.append({"round": r, "won": False, "invested": investments[a.agent_id], "return": -loss})
+                a.history.append({"round": r, "won": False, "invested": invested, "return": -refund})
 
         # Apply inflation
         for a in agents:
