@@ -158,14 +158,32 @@ class AccountabilityLedger:
 
     @classmethod
     def from_json(cls, data: List[Dict[str, Any]]) -> "AccountabilityLedger":
+        """Deserialise a previously-exported ledger.
+
+        Validates the incoming structure defensively so that a malformed or
+        attacker-crafted JSON file cannot crash the audit pipeline or inject
+        unexpected types into downstream analysis.
+        """
+        if not isinstance(data, list):
+            raise ValueError("Ledger JSON must be a list of entry objects.")
         ledger = cls()
-        for d in data:
+        required_keys = {"index", "timestamp", "round_result", "prev_hash", "entry_hash"}
+        for i, d in enumerate(data):
+            if not isinstance(d, dict):
+                raise ValueError(f"Ledger entry {i} is not an object.")
+            missing = required_keys - d.keys()
+            if missing:
+                raise ValueError(f"Ledger entry {i} missing keys: {missing}")
+            if not isinstance(d["index"], int):
+                raise ValueError(f"Ledger entry {i}: 'index' must be an integer.")
+            if not isinstance(d["round_result"], dict):
+                raise ValueError(f"Ledger entry {i}: 'round_result' must be an object.")
             entry = LedgerEntry(
                 index=d["index"],
-                timestamp=d["timestamp"],
+                timestamp=str(d["timestamp"]),
                 round_result=d["round_result"],
-                prev_hash=d["prev_hash"],
-                entry_hash=d["entry_hash"],
+                prev_hash=str(d["prev_hash"]),
+                entry_hash=str(d["entry_hash"]),
             )
             ledger.entries.append(entry)
         return ledger
@@ -832,9 +850,20 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 async def _async_main(args: argparse.Namespace) -> None:
     if args.audit_only:
-        path = Path(args.audit_only)
-        data = json.loads(path.read_text())
-        ledger = AccountabilityLedger.from_json(data)
+        path = Path(args.audit_only).resolve()
+        if not path.is_file():
+            print(f"Error: ledger file not found: {path}", file=sys.stderr)
+            sys.exit(1)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            print(f"Error: invalid JSON in {path.name}: {exc}", file=sys.stderr)
+            sys.exit(1)
+        try:
+            ledger = AccountabilityLedger.from_json(data)
+        except (ValueError, TypeError) as exc:
+            print(f"Error: malformed ledger structure: {exc}", file=sys.stderr)
+            sys.exit(1)
         audit = AuditEngine(ledger)
         audit.run_full_audit()
         print(f"Audited {len(ledger.entries)} entries from {path.name}")

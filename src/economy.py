@@ -80,8 +80,14 @@ class EconAgent:
         return self.wins / total if total > 0 else 0.0
 
     def decide_investment(self, round_idx: int) -> float:
-        """Choose how much budget to invest this round."""
+        """Choose how much budget to invest this round.
+
+        Returns 0 when the agent has no positive budget, preventing
+        negative-balance agents (e.g. after inflation erosion) from
+        placing phantom investments.
+        """
         if self.budget <= 0:
+            self.budget = 0.0  # clamp to zero — no debt accumulation
             return 0.0
 
         if self.strategy == "conservative":
@@ -203,26 +209,42 @@ def _autonomous_fiscal_policy(market: MarketState, agents: List[EconAgent]) -> O
 
 
 def _apply_fiscal_policy(policy: FiscalPolicy, market: MarketState, agents: List[EconAgent]) -> None:
-    """Execute a fiscal policy decision."""
+    """Execute a fiscal policy decision.
+
+    All spending is bounded by the available ``subsidy_pool`` to prevent
+    unbounded money creation.  When the pool is exhausted mid-disbursement
+    remaining agents receive nothing — a deliberate scarcity constraint.
+    """
     if policy.action == "redistribute":
         market.tax_rate = min(market.tax_rate + policy.parameters.get("tax_increase", 0), 0.25)
         subsidy = policy.parameters.get("subsidy_amount", 10)
         poorest = sorted(agents, key=lambda a: a.budget)[:max(1, len(agents) // 3)]
         for a in poorest:
-            a.budget += subsidy
-            market.subsidy_pool -= subsidy
+            disbursement = min(subsidy, market.subsidy_pool)
+            if disbursement <= 0:
+                break
+            a.budget += disbursement
+            market.subsidy_pool -= disbursement
 
     elif policy.action == "bailout":
         amount = policy.parameters.get("bailout_amount", 20)
         for a in agents:
             if a.budget <= 0:
-                a.budget = amount
+                disbursement = min(amount, market.subsidy_pool)
+                if disbursement <= 0:
+                    break
+                a.budget = disbursement
                 a.bankruptcies += 1
+                market.subsidy_pool -= disbursement
 
     elif policy.action == "stimulus":
         amount = policy.parameters.get("stimulus_amount", 15)
         for a in agents:
-            a.budget += amount
+            disbursement = min(amount, market.subsidy_pool)
+            if disbursement <= 0:
+                break
+            a.budget += disbursement
+            market.subsidy_pool -= disbursement
 
     elif policy.action == "tighten":
         reduction = policy.parameters.get("inflation_reduction", 0.02)
@@ -307,9 +329,11 @@ async def run_economy(
             for a in agents:
                 invested = investments[a.agent_id]
                 refund = invested * 0.5  # get half back
+                loss = invested - refund  # actual capital lost
                 a.budget += refund
+                a.total_returns -= loss  # track net loss in returns
                 a.losses += 1
-                a.history.append({"round": r, "won": False, "invested": invested, "return": -refund})
+                a.history.append({"round": r, "won": False, "invested": invested, "return": -loss})
 
         # Apply inflation
         for a in agents:
