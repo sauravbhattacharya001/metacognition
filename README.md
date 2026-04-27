@@ -114,6 +114,55 @@ result = await engine.run("What caused the 2008 financial crisis?")
 
 **Tip:** Use diverse models (e.g., mix GPT-4, Claude, Gemini) — homogeneous agents may agree on the same mistakes, defeating the purpose.
 
+## Consensus Autopilot
+
+The **Autopilot** is an autonomous swarm governor that processes task queues through continuous consensus rounds while self-tuning the protocol:
+
+- **Adaptive threshold** — automatically raises θ after successful commits (tightening safety) and lowers it after consecutive stalls (restoring liveness)
+- **Agent quarantine** — benches agents whose reputation drops below a configurable floor, reinstating them on probation after a cooldown period
+- **Health monitoring** — tracks commit rate, average rounds, stall streaks, quarantine events, and threshold adjustments
+- **Pluggable task source** — accepts task files, lists, or any async iterator
+
+```bash
+# Run the demo (10 tasks through a 7-agent swarm)
+python -m src.autopilot
+
+# Larger swarm, more cycles
+python -m src.autopilot --agents 9 --cycles 20
+
+# Custom task file (one task per line)
+python -m src.autopilot --tasks my_tasks.txt
+
+# Export JSON report or interactive HTML dashboard
+python -m src.autopilot --export json -o report.json
+python -m src.autopilot --export html -o dashboard.html
+
+# Tune quarantine sensitivity
+python -m src.autopilot --quarantine-floor 0.4 --quarantine-cooldown 60
+```
+
+**Programmatic usage:**
+
+```python
+from src.autopilot import ConsensusAutopilot, tasks_from_list
+from src.agents.metacognitive import MockAgent
+
+agents = [
+    MockAgent("a1", answer="correct", confidence=0.9),
+    MockAgent("a2", answer="correct", confidence=0.8),
+    MockAgent("a3", answer="wrong", confidence=0.5),
+    MockAgent("a4", answer="byz", confidence=0.95, byzantine=True),
+]
+
+pilot = ConsensusAutopilot(agents, initial_threshold=1.5)
+tasks = tasks_from_list(["task 1", "task 2", "task 3"])
+health = await pilot.run_queue(tasks)
+print(f"Commit rate: {health.commit_rate:.0%}")
+print(pilot.status_summary())
+```
+
+The Autopilot embodies the "agency" direction for mBFT — it doesn't just run consensus, it *governs* the swarm autonomously.
+
 ## Project Structure
 
 ```
@@ -126,6 +175,7 @@ metacognition/
 │   │   ├── base.py         # Abstract BaseAgent contract
 │   │   └── metacognitive.py # MockAgent + MetacognitiveAgent (LLM)
 │   ├── network/            # Async simulator
+│   ├── autopilot.py        # Consensus Autopilot — autonomous swarm governor
 │   ├── adversarial_trainer.py  # Red-team testing for agent swarms
 │   ├── calibrator.py       # Confidence calibration utilities
 │   ├── diversity.py        # Model diversity analysis
