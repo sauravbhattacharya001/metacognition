@@ -256,9 +256,16 @@ class SwarmMemory:
 
     # -- Decay Weighting ----------------------------------------------------
 
-    def _weight(self, episode: Episode) -> float:
-        """Exponential decay weight based on episode age."""
-        age_s = time.time() - episode.timestamp
+    def _weight(self, episode: Episode, now: Optional[float] = None) -> float:
+        """Exponential decay weight based on episode age.
+
+        Parameters
+        ----------
+        now : float, optional
+            Pre-captured current timestamp to avoid repeated time.time()
+            calls in tight loops.
+        """
+        age_s = (now if now is not None else time.time()) - episode.timestamp
         age_days = age_s / 86400.0
         return math.exp(-math.log(2) * age_days / self.half_life_days)
 
@@ -270,6 +277,24 @@ class SwarmMemory:
         tokens_b = [w.lower().strip("?.,!;:'\"()[]{}") for w in task_b.split() if len(w) > 1]
         return _jaccard(tokens_a, tokens_b)
 
+    def _task_similarity_precomputed(
+        self, query_tokens_set: set, ep_task: str,
+    ) -> float:
+        """Task similarity with pre-computed query token set.
+
+        Avoids re-tokenizing the query string on every episode comparison
+        in find_similar (O(E) tokenizations -> O(1) for the query side).
+        """
+        ep_tokens = set(
+            w.lower().strip("?.,!;:'\"()[]{}")
+            for w in ep_task.split()
+            if len(w) > 1
+        )
+        union = query_tokens_set | ep_tokens
+        if not union:
+            return 1.0
+        return len(query_tokens_set & ep_tokens) / len(union)
+
     def _config_similarity(self, ep: Episode, agent_count: int, threshold: float) -> float:
         """Configuration similarity (agent count + threshold band)."""
         agent_sim = 1.0 - abs(ep.agent_count - agent_count) / max(ep.agent_count, agent_count, 1)
@@ -277,12 +302,22 @@ class SwarmMemory:
         return 0.6 * agent_sim + 0.4 * thresh_sim
 
     def find_similar(self, task: str, top_k: int = 10) -> List[Tuple[Episode, float]]:
-        """Find the top-k most similar episodes to a task."""
+        """Find the top-k most similar episodes to a task.
+
+        Optimised: pre-tokenizes the query once and captures time.time()
+        once, avoiding O(E) redundant tokenizations and syscalls.
+        """
+        query_tokens = set(
+            w.lower().strip("?.,!;:'\"()[]{}")
+            for w in task.split()
+            if len(w) > 1
+        )
+        now = time.time()
         scored: List[Tuple[Episode, float]] = []
         for ep in self.episodes:
-            sim = self._task_similarity(task, ep.task)
+            sim = self._task_similarity_precomputed(query_tokens, ep.task)
             if sim >= self.min_similarity:
-                w = self._weight(ep)
+                w = self._weight(ep, now=now)
                 scored.append((ep, sim * w))
         scored.sort(key=lambda x: x[1], reverse=True)
         return scored[:top_k]
@@ -347,16 +382,25 @@ class SwarmMemory:
 
         Returns a weighted success rate based on similar configurations
         in memory. Returns 0.5 (uncertain) if no relevant history.
+
+        Optimised: captures time.time() once and pre-computes the
+        threshold band for the query to avoid repeated string comparisons.
         """
         if not self.episodes:
             return 0.5
 
+        now = time.time()
+        query_band = _threshold_band(threshold)
         weighted_success = 0.0
         total_weight = 0.0
         for ep in self.episodes:
-            sim = self._config_similarity(ep, agent_count, threshold)
+            # Inline config similarity with pre-computed query band
+            agent_sim = 1.0 - abs(ep.agent_count - agent_count) / max(ep.agent_count, agent_count, 1)
+            thresh_sim = 1.0 if _threshold_band(ep.threshold) == query_band else 0.5
+            sim = 0.6 * agent_sim + 0.4 * thresh_sim
+
             byz_sim = 1.0 - abs(ep.byzantine_fraction() - byzantine_fraction)
-            combined = sim * byz_sim * self._weight(ep)
+            combined = sim * byz_sim * self._weight(ep, now=now)
             if combined > 0.05:
                 weighted_success += combined * (1.0 if ep.committed else 0.0)
                 total_weight += combined
@@ -400,7 +444,9 @@ class SwarmMemory:
         successes = 0
 
         for ep, score in similar:
-            w = score * self._weight(ep) * (1.5 if ep.committed else 0.5)
+            # score from find_similar already incorporates decay weight,
+            # so we only apply the outcome multiplier here.
+            w = score * (1.5 if ep.committed else 0.5)
             w_agents += w * ep.agent_count
             w_threshold += w * ep.threshold
             w_rounds += w * ep.rounds_used
@@ -496,22 +542,33 @@ class SwarmMemory:
             )
 
         now = time.time()
-        ages = [(now - e.timestamp) / 86400.0 for e in self.episodes]
-        age_days = max(ages) if ages else 0.0
+        half_life_s = self.half_life_days * 86400.0
+        max_age_s = 0.0
+        fresh_count = 0
+        success_count = 0
+        buckets: set = set()
+
+        # Single-pass: collect freshness, coverage, success counts
+        for ep in self.episodes:
+            age_s = now - ep.timestamp
+            if age_s > max_age_s:
+                max_age_s = age_s
+            if age_s <= half_life_s:
+                fresh_count += 1
+            if ep.committed:
+                success_count += 1
+            buckets.add((_agent_band(ep.agent_count), _threshold_band(ep.threshold)))
+
+        age_days = max_age_s / 86400.0
 
         # Freshness: what fraction of episodes are within half-life?
-        fresh_count = sum(1 for a in ages if a <= self.half_life_days)
         freshness = (fresh_count / n) * 100.0
 
         # Coverage: how many distinct config buckets are represented?
-        buckets = set()
-        for ep in self.episodes:
-            buckets.add(f"{_agent_band(ep.agent_count)}_{_threshold_band(ep.threshold)}")
         max_buckets = 4 * 4  # 4 agent bands × 4 threshold bands
         coverage = min(100.0, (len(buckets) / max_buckets) * 100.0)
 
         # Bias: is the success/failure ratio extremely skewed?
-        success_count = sum(1 for e in self.episodes if e.committed)
         ratio = success_count / n
         # Bias score is highest (100) when ratio ~0.5, lowest at extremes
         bias = 100.0 * (1.0 - abs(ratio - 0.5) * 2.0)
