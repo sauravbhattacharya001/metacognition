@@ -93,18 +93,17 @@ async def _run_cell(
     total_rounds = 0
     total_agg = 0.0
 
+    # Pre-compute per-agent parameters once — they are identical every trial.
+    _agent_params = [
+        (f"a{i}", "wrong" if i < n_byz else "correct",
+         0.6 if i < n_byz else 0.8, i < n_byz)
+        for i in range(n_agents)
+    ]
+
     for _ in range(trials):
-        agents = []
-        for i in range(n_agents):
-            is_byz = i < n_byz
-            agents.append(
-                MockAgent(
-                    agent_id=f"a{i}",
-                    answer="correct" if not is_byz else "wrong",
-                    confidence=0.8 if not is_byz else 0.6,
-                    byzantine=is_byz,
-                )
-            )
+        agents = [MockAgent(
+            agent_id=aid, answer=ans, confidence=conf, byzantine=byz,
+        ) for aid, ans, conf, byz in _agent_params]
         engine = MBFTEngine(agents, threshold=threshold, max_rounds=max_rounds)
         result = await engine.run("stability-probe")
         if result and result.committed:
@@ -133,6 +132,8 @@ async def sweep(
     """Sweep the parameter grid and return a 2-D matrix of CellResults.
 
     Rows index threshold (ascending), columns index byzantine_ratio (ascending).
+    Runs all cells in each row concurrently via asyncio.gather for ~resolution×
+    speedup over purely sequential iteration.
     """
     thresholds = [round(i / (resolution - 1), 4) for i in range(resolution)]
     byz_ratios = [round(i / (resolution - 1), 4) for i in range(resolution)]
@@ -149,14 +150,15 @@ async def sweep(
     done = 0
 
     for ti, thr in enumerate(thresholds):
-        row: List[CellResult] = []
-        for bi, byz in enumerate(byz_ratios):
-            cell = await _run_cell(n_agents, thr, byz, trials, max_rounds)
-            row.append(cell)
-            done += 1
-            if progress_cb:
-                progress_cb(done, total)
-        grid.append(row)
+        # Run all columns in this row concurrently — cells are independent
+        row = await asyncio.gather(*[
+            _run_cell(n_agents, thr, byz, trials, max_rounds)
+            for byz in byz_ratios
+        ])
+        grid.append(list(row))
+        done += len(byz_ratios)
+        if progress_cb:
+            progress_cb(done, total)
     return grid
 
 
@@ -317,13 +319,18 @@ async def autopilot_zoom(
     thresholds = _linspace(t_lo, t_hi, zoom_res)
     byz_ratios = _linspace(b_lo, b_hi, zoom_res)
 
+    # Run all zoom cells concurrently — entire grid is independent
+    coros = [
+        _run_cell(n_agents, thr, byz, trials * 2, max_rounds)
+        for thr in thresholds
+        for byz in byz_ratios
+    ]
+    flat_results = await asyncio.gather(*coros)
+
+    # Reshape flat results into 2-D grid
     zoom_grid: List[List[CellResult]] = []
-    for thr in thresholds:
-        row = []
-        for byz in byz_ratios:
-            cell = await _run_cell(n_agents, thr, byz, trials * 2, max_rounds)
-            row.append(cell)
-        zoom_grid.append(row)
+    for r_idx in range(zoom_res):
+        zoom_grid.append(list(flat_results[r_idx * zoom_res:(r_idx + 1) * zoom_res]))
     return zoom_grid
 
 
