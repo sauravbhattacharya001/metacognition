@@ -249,21 +249,25 @@ class ImmuneSystem:
         return results
 
     def _detect_collusion(self, votes: dict) -> List[Pathogen]:
-        """Groups always voting together (Jaccard > threshold)."""
+        """Groups always voting together (Jaccard > threshold).
+
+        Optimised: precomputes per-agent approve-round sets once (O(A*R))
+        then performs O(A²) pairwise Jaccard on prebuilt sets instead of
+        rebuilding sets inside the nested loop (was O(A²*R)).
+        """
         results: List[Pathogen] = []
         if len(self._vote_history) < 2 or self._total_rounds < 4:
             return results
         agents = [a for a in self._vote_history if len(self._vote_history[a]) >= 4]
-        checked: set = set()
+        # Precompute approve-round sets once per agent
+        approve_sets: Dict[str, set] = {
+            a: {i for i, v in enumerate(self._vote_history[a]) if v}
+            for a in agents
+        }
         for i, a in enumerate(agents):
+            set_a = approve_sets[a]
             for b in agents[i + 1:]:
-                key = tuple(sorted([a, b]))
-                if key in checked:
-                    continue
-                checked.add(key)
-                # Jaccard over approve-round sets
-                set_a = {i for i, v in enumerate(self._vote_history[a]) if v}
-                set_b = {i for i, v in enumerate(self._vote_history[b]) if v}
+                set_b = approve_sets[b]
                 sim = _jaccard(set_a, set_b)
                 if sim > self.sensitivity and sim > 0.8:
                     pid = _hash_id("collusion", a, b, str(self.current_round))
@@ -336,28 +340,57 @@ class ImmuneSystem:
         return results
 
     def _detect_sybil(self, votes: dict) -> List[Pathogen]:
-        """Agents with suspiciously similar voting patterns (cosine similarity)."""
+        """Agents with suspiciously similar voting patterns (cosine similarity).
+
+        Optimised: precomputes per-agent vote vectors and their magnitudes
+        once (O(A*R)), then performs O(A²) pairwise cosine using cached
+        vectors+magnitudes instead of rebuilding inside the nested loop
+        (was O(A²*R) with redundant list comprehensions and sqrt calls).
+        """
         results: List[Pathogen] = []
         if self._total_rounds < 5:
             return results
         agents = [a for a in self._vote_history if len(self._vote_history[a]) >= 5]
-        checked: set = set()
+
+        # Precompute vote vectors and magnitudes once per agent
+        vote_vecs: Dict[str, List[float]] = {}
+        vote_mags: Dict[str, float] = {}
+        for a in agents:
+            vec = [1.0 if v else 0.0 for v in self._vote_history[a]]
+            vote_vecs[a] = vec
+            vote_mags[a] = math.sqrt(sum(x * x for x in vec))
+
+        # Precompute confidence magnitudes
+        conf_mags: Dict[str, float] = {}
+        for a in agents:
+            conf = self._confidence_history.get(a, [])
+            if len(conf) >= 3:
+                conf_mags[a] = math.sqrt(sum(x * x for x in conf))
+
         for i, a in enumerate(agents):
+            vec_a = vote_vecs[a]
+            mag_a = vote_mags[a]
+            conf_a = self._confidence_history.get(a, [])
+            cmag_a = conf_mags.get(a, 0.0)
             for b in agents[i + 1:]:
-                key = tuple(sorted([a, b]))
-                if key in checked:
-                    continue
-                checked.add(key)
-                vec_a = [1.0 if v else 0.0 for v in self._vote_history[a]]
-                vec_b = [1.0 if v else 0.0 for v in self._vote_history[b]]
-                # Align lengths
+                vec_b = vote_vecs[b]
+                mag_b = vote_mags[b]
+                # Vote cosine with precomputed magnitudes
                 min_len = min(len(vec_a), len(vec_b))
-                sim = _cosine(vec_a[:min_len], vec_b[:min_len])
-                # Also check confidence similarity
-                conf_a = self._confidence_history.get(a, [])
+                if mag_a == 0 or mag_b == 0:
+                    sim = 0.0
+                else:
+                    dot = sum(vec_a[k] * vec_b[k] for k in range(min_len))
+                    sim = dot / (mag_a * mag_b)
+                # Confidence cosine with precomputed magnitudes
                 conf_b = self._confidence_history.get(b, [])
                 conf_min = min(len(conf_a), len(conf_b))
-                conf_sim = _cosine(conf_a[:conf_min], conf_b[:conf_min]) if conf_min >= 3 else 0.0
+                cmag_b = conf_mags.get(b, 0.0)
+                if conf_min >= 3 and cmag_a > 0 and cmag_b > 0:
+                    cdot = sum(conf_a[k] * conf_b[k] for k in range(conf_min))
+                    conf_sim = cdot / (cmag_a * cmag_b)
+                else:
+                    conf_sim = 0.0
                 combined = (sim + conf_sim) / 2
                 if combined > 0.95 and combined > self.sensitivity:
                     pid = _hash_id("sybil", a, b, str(self.current_round))
