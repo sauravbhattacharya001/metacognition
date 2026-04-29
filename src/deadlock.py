@@ -20,7 +20,6 @@ import asyncio
 import json
 import math
 import random
-import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from itertools import combinations
@@ -28,7 +27,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .agents.metacognitive import MockAgent
 from .core.protocol import MBFTEngine
-from .core.state import RoundResult, Vote
+from .core.state import RoundResult
 
 
 # ---------------------------------------------------------------------------

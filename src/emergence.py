@@ -21,10 +21,9 @@ import html
 import json
 import math
 import statistics
-import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 from src.core.state import RoundResult
 

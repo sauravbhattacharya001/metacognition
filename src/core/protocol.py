@@ -7,13 +7,9 @@ confidence-weighted finality.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from .state import Proposal, RoundResult, Vote
-
-if TYPE_CHECKING:
-    from src.agents.base import BaseAgent
-
 
 class MBFTEngine:
     """Run mBFT rounds over a fixed set of agents."""

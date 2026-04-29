@@ -38,15 +38,12 @@ import argparse
 import asyncio
 import html as html_mod
 import json
-import math
 import os
 import random
 import statistics
-import sys
-import time
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine

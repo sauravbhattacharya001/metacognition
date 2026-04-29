@@ -30,12 +30,11 @@ import argparse
 import html as html_mod
 import io
 import json
-import math
 import statistics
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from src.core.state import Proposal, RoundResult
 

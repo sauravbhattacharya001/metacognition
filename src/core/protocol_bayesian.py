@@ -46,15 +46,11 @@ from __future__ import annotations
 
 import asyncio
 import math
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
 from .state import Proposal
-
-if TYPE_CHECKING:
-    from src.agents.base import BaseAgent
-
 
 class BayesianRoundResult(BaseModel):
     round_index: int

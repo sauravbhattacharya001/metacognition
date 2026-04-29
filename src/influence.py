@@ -13,7 +13,6 @@ import html as _html
 import json
 import math
 import random
-import sys
 from typing import Dict, List, Tuple
 
 from src.agents.metacognitive import MockAgent

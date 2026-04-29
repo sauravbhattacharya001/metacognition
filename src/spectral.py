@@ -30,8 +30,7 @@ import json
 import math
 import os
 import sys
-from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 # ---------------------------------------------------------------------------
 # Minimal FFT (no numpy dependency)

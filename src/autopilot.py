@@ -34,7 +34,6 @@ from typing import AsyncIterator, Dict, List, Optional
 
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine
-from src.core.state import RoundResult
 
 
 # ---------------------------------------------------------------------------

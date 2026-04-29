@@ -22,10 +22,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import html
-import itertools
 import json
 import random
-import sys
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 

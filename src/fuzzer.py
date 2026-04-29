@@ -22,11 +22,9 @@ import argparse
 import asyncio
 import hashlib
 import json
-import math
 import random
-import sys
 import time
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple

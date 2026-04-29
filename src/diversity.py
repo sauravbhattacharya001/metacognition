@@ -25,9 +25,8 @@ import asyncio
 import html
 import json
 import math
-import sys
 from collections import Counter
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine

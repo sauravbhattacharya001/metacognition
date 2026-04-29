@@ -34,7 +34,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine
-from src.core.state import RoundResult, Vote
+from src.core.state import RoundResult
 
 # -- Ledger Entry ---------------------------------------------------------
 
