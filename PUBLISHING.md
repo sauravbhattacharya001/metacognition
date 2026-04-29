@@ -7,7 +7,13 @@ This project uses [Trusted Publishers](https://docs.pypi.org/trusted-publishers/
 Releases are published automatically when a GitHub Release is created:
 
 1. **Create a release** on GitHub (tag format: `vX.Y.Z`)
-2. The `publish.yml` workflow builds, verifies, and publishes to PyPI
+2. The `publish.yml` workflow builds, verifies, attests, and publishes to PyPI
+
+### Safety checks (automatic)
+
+- **Version-tag consistency** — the release tag must match `src/__version__`; mismatches abort the pipeline
+- **PEP 561 marker** — verifies `src/py.typed` is present so downstream type checkers can use the package
+- **Build attestation** — [SLSA provenance](https://slsa.dev/) generated via `actions/attest-build-provenance@v2` for supply-chain verification
 
 ## Manual Publishing
 
@@ -46,9 +52,11 @@ twine check dist/*
 
 # Test install
 pip install dist/mbft_consensus-*.whl
+python -c "from src import __version__; print(__version__)"
 python -c "from src.core import MBFTEngine; print('OK')"
 ```
 
 ## Version Bumps
 
-Update `version` in `pyproject.toml` before creating a release tag.
+Update `__version__` in `src/__init__.py` before creating a release tag.
+The version is read dynamically from `src.__version__` via `pyproject.toml` (`[tool.setuptools.dynamic]`).

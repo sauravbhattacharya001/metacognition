@@ -16,6 +16,8 @@ on:
 
 permissions:
   contents: read
+  attestations: write
+  id-token: write
 
 jobs:
   build:
@@ -38,6 +40,28 @@ jobs:
         run: |
           pip install twine
           twine check dist/*
+
+      - name: Verify version-tag consistency
+        if: github.event_name == 'release'
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          PKG_VER=$(python -c "import tomllib, pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project'].get('version', ''))" 2>/dev/null || true)
+          # For dynamic version, read from src/__init__.py
+          if [ -z "$PKG_VER" ]; then
+            PKG_VER=$(python -c "from src import __version__; print(__version__)")
+          fi
+          echo "Git tag: $TAG  Package version: $PKG_VER"
+          if [ "v$PKG_VER" != "$TAG" ]; then
+            echo "::error::Version mismatch — pyproject.toml ($PKG_VER) does not match release tag ($TAG)"
+            exit 1
+          fi
+
+      - name: Verify py.typed marker
+        run: |
+          if [ ! -f src/py.typed ]; then
+            echo "::error::Missing src/py.typed — PEP 561 marker required for typed package"
+            exit 1
+          fi
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -66,11 +90,12 @@ jobs:
       - name: Install from wheel
         run: pip install dist/*.whl
 
-      - name: Verify import
+      - name: Verify import and version
         run: |
           python -c "from src.core import MBFTEngine, Proposal, Vote; print('core OK')"
           python -c "from src.agents import MetacognitiveAgent; print('agents OK')"
           python -c "from src.network import NetworkSimulator; print('network OK')" || true
+          python -c "from src import __version__; assert __version__, 'missing __version__'; print(f'version {__version__} OK')"
 
   publish-testpypi:
     name: Publish to TestPyPI
@@ -91,9 +116,28 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
 
+  attest:
+    name: Generate build attestation
+    needs: [build, test-install]
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*
+
   publish-pypi:
     name: Publish to PyPI
-    needs: [build, test-install]
+    needs: [build, test-install, attest]
     if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish_target == 'pypi')
     runs-on: ubuntu-latest
     environment: pypi

@@ -4,7 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mbft-consensus"
-version = "0.1.0"
+dynamic = ["version"]
+
 description = "Metacognitive Byzantine Fault Tolerance reference implementation."
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -40,9 +41,15 @@ Repository = "https://github.com/sauravbhattacharya001/metacognition"
 Issues = "https://github.com/sauravbhattacharya001/metacognition/issues"
 Changelog = "https://github.com/sauravbhattacharya001/metacognition/releases"
 
+[tool.setuptools.dynamic]
+version = {attr = "src.__version__"}
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
+
+[tool.setuptools.package-data]
+src = ["py.typed"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
