@@ -135,6 +135,15 @@ def _euclidean(a: List[float], b: List[float]) -> float:
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
 
 
+def _sq_euclidean(a: List[float], b: List[float]) -> float:
+    """Squared Euclidean distance — avoids sqrt when only ordering matters."""
+    s = 0.0
+    for x, y in zip(a, b):
+        d = x - y
+        s += d * d
+    return s
+
+
 def _centroid(vectors: List[List[float]]) -> List[float]:
     if not vectors:
         return []
@@ -149,12 +158,21 @@ def _kmeans(
     restarts: int = 5,
     rng: Optional[random.Random] = None,
 ) -> Tuple[List[int], List[List[float]], float]:
-    """K-means clustering. Returns (labels, centroids, wcss)."""
+    """K-means clustering. Returns (labels, centroids, wcss).
+
+    Performance notes:
+    - Uses squared Euclidean distance for assignment (avoids n*k sqrt
+      calls per iteration — sqrt is monotonic so argmin is unchanged).
+    - Computes centroid updates incrementally via running sums instead
+      of materializing per-cluster member lists then averaging.
+    - WCSS is computed using squared distance directly (no sqrt+square).
+    """
     if not vectors or k <= 0:
         return [], [], 0.0
     rng = rng or random.Random()
     n = len(vectors)
     k = min(k, n)
+    dim = len(vectors[0])
     best_labels: List[int] = list(range(n))
     best_centroids: List[List[float]] = []
     best_wcss = float("inf")
@@ -166,23 +184,41 @@ def _kmeans(
         labels = [0] * n
 
         for _it in range(max_iter):
-            # assign
-            new_labels = []
-            for v in vectors:
-                dists = [_euclidean(v, c) for c in centroids]
-                new_labels.append(dists.index(min(dists)))
-            if new_labels == labels and _it > 0:
+            # assign — squared distance avoids sqrt (O(n*k*dim) but no sqrt)
+            changed = False
+            for vi in range(n):
+                v = vectors[vi]
+                best_ci = 0
+                best_dist = _sq_euclidean(v, centroids[0])
+                for ci in range(1, k):
+                    d = _sq_euclidean(v, centroids[ci])
+                    if d < best_dist:
+                        best_dist = d
+                        best_ci = ci
+                if labels[vi] != best_ci:
+                    labels[vi] = best_ci
+                    changed = True
+            if not changed and _it > 0:
                 break
-            labels = new_labels
 
-            # update centroids
+            # update centroids using running sums (avoids list materialization)
+            sums = [[0.0] * dim for _ in range(k)]
+            counts = [0] * k
+            for vi in range(n):
+                ci = labels[vi]
+                counts[ci] += 1
+                row = sums[ci]
+                vec = vectors[vi]
+                for d_idx in range(dim):
+                    row[d_idx] += vec[d_idx]
             for ci in range(k):
-                members = [vectors[j] for j in range(n) if labels[j] == ci]
-                if members:
-                    centroids[ci] = _centroid(members)
+                if counts[ci] > 0:
+                    c = counts[ci]
+                    centroids[ci] = [sums[ci][d_idx] / c for d_idx in range(dim)]
 
+        # WCSS — squared distance directly (no sqrt then square)
         wcss = sum(
-            _euclidean(vectors[i], centroids[labels[i]]) ** 2
+            _sq_euclidean(vectors[i], centroids[labels[i]])
             for i in range(n)
         )
         if wcss < best_wcss:
