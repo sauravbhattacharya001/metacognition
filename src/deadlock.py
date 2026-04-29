@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .agents.metacognitive import MockAgent
 from .core.protocol import MBFTEngine
+from .stats_utils import pearson as _pearson
 from .core.state import RoundResult, Vote
 
 
@@ -344,17 +345,7 @@ class DeadlockDetector:
         return resolutions
 
 
-def _pearson(x: List[float], y: List[float]) -> float:
-    """Pearson correlation coefficient."""
-    n = len(x)
-    if n < 2:
-        return 0.0
-    mx, my = sum(x) / n, sum(y) / n
-    sx = math.sqrt(sum((xi - mx) ** 2 for xi in x))
-    sy = math.sqrt(sum((yi - my) ** 2 for yi in y))
-    if sx == 0 or sy == 0:
-        return 0.0
-    return sum((xi - mx) * (yi - my) for xi, yi in zip(x, y)) / (sx * sy)
+
 
 
 # ---------------------------------------------------------------------------

@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from src.core.state import RoundResult
+from src.stats_utils import gini as _gini, pearson as _pearson
 
 
 # ── Data Structures ──────────────────────────────────────────────
@@ -64,28 +65,7 @@ class EmergenceReport:
 
 # ── Analysis Functions ───────────────────────────────────────────
 
-def _gini(values: List[float]) -> float:
-    """Compute Gini coefficient."""
-    if not values or sum(values) == 0:
-        return 0.0
-    sorted_v = sorted(values)
-    n = len(sorted_v)
-    numerator = sum((2 * i - n + 1) * v for i, v in enumerate(sorted_v))
-    denominator = n * sum(sorted_v)
-    return numerator / denominator if denominator else 0.0
 
-
-def _pearson(x: List[float], y: List[float]) -> float:
-    """Pearson correlation between two series."""
-    n = len(x)
-    if n < 3:
-        return 0.0
-    mx, my = statistics.mean(x), statistics.mean(y)
-    sx = math.sqrt(sum((xi - mx) ** 2 for xi in x))
-    sy = math.sqrt(sum((yi - my) ** 2 for yi in y))
-    if sx == 0 or sy == 0:
-        return 0.0
-    return sum((xi - mx) * (yi - my) for xi, yi in zip(x, y)) / (sx * sy)
 
 
 def analyze_emergence(histories: List[List[RoundResult]]) -> EmergenceReport:

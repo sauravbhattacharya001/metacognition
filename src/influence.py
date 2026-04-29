@@ -19,35 +19,12 @@ from typing import Dict, List, Tuple
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine
 from src.core.state import RoundResult
+from src.stats_utils import gini as _gini, pearson as _pearson
 
 
 # ── helpers ──────────────────────────────────────────────────────────────
 
-def _gini(values: List[float]) -> float:
-    """Gini coefficient of *values*."""
-    if not values or max(values) == 0:
-        return 0.0
-    s = sorted(values)
-    n = len(s)
-    total = sum(s)
-    if total == 0:
-        return 0.0
-    cum = sum((2 * (i + 1) - n - 1) * v for i, v in enumerate(s))
-    return cum / (n * total)
 
-
-def _pearson(xs: List[float], ys: List[float]) -> float:
-    n = len(xs)
-    if n < 2:
-        return 0.0
-    mx = sum(xs) / n
-    my = sum(ys) / n
-    num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
-    dx = math.sqrt(sum((x - mx) ** 2 for x in xs))
-    dy = math.sqrt(sum((y - my) ** 2 for y in ys))
-    if dx == 0 or dy == 0:
-        return 0.0
-    return num / (dx * dy)
 
 
 # ── simulation ───────────────────────────────────────────────────────────
