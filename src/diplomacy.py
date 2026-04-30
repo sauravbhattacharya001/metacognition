@@ -112,6 +112,41 @@ class DiplomacyEngine:
         self.recommendations: List[str] = []
 
     # -----------------------------------------------------------------------
+    # Shared helpers
+    # -----------------------------------------------------------------------
+
+    def _build_sim_matrix(self) -> Dict[Tuple[str, str], float]:
+        """Compute pairwise cosine similarity between all agent vote vectors.
+
+        Previously this was done independently in both _detect_factions and
+        _compute_alliances, doubling O(n²) cosine work. Now computed once
+        and stored as self._sim_matrix for reuse.
+        """
+        n = len(self.agent_names)
+        mat: Dict[Tuple[str, str], float] = {}
+        for i in range(n):
+            for j in range(i + 1, n):
+                a, b = self.agent_names[i], self.agent_names[j]
+                sim = _cosine_sim(self.agent_vectors[a], self.agent_vectors[b])
+                mat[(a, b)] = sim
+                mat[(b, a)] = sim
+        return mat
+
+    def _faction_avg_vote(self, members: List[str], task_idx: int) -> float:
+        """Compute the average vote for a faction across all rounds of a task.
+
+        Extracted from _detect_treaties where it was inlined and duplicated
+        for both the full-task sweep and the late-task sweep.
+        """
+        if not members:
+            return 0.0
+        total = sum(
+            sum(self.vote_matrix[task_idx][r].get(m, 0) for r in range(self.n_rounds)) / self.n_rounds
+            for m in members
+        )
+        return total / len(members)
+
+    # -----------------------------------------------------------------------
     # Simulation
     # -----------------------------------------------------------------------
 
@@ -157,14 +192,15 @@ class DiplomacyEngine:
                     self.agent_vectors[agent].append(v)
             self.vote_matrix.append(task_rounds)
 
-        # Phase 2: Detect factions
+        # Phase 2: Compute similarity matrix (shared by factions + alliances)
         if verbose:
-            print("Phase 2: Detecting factions...")
-        self._detect_factions()
+            print("Phase 2: Computing similarity matrix...")
+        self._sim_matrix = self._build_sim_matrix()
 
-        # Phase 3: Compute alliance strengths
+        # Phase 3: Detect factions + alliances (reuse sim matrix)
         if verbose:
-            print("Phase 3: Computing alliance strengths...")
+            print("Phase 3: Detecting factions & alliances...")
+        self._detect_factions()
         self._compute_alliances()
 
         # Phase 4: Detect treaties
@@ -200,17 +236,13 @@ class DiplomacyEngine:
     # -----------------------------------------------------------------------
 
     def _detect_factions(self) -> None:
-        """Cluster agents by voting similarity using greedy agglomerative approach."""
-        n = len(self.agent_names)
-        sim_matrix = {}
-        for i in range(n):
-            for j in range(i + 1, n):
-                a, b = self.agent_names[i], self.agent_names[j]
-                sim = _cosine_sim(self.agent_vectors[a], self.agent_vectors[b])
-                sim_matrix[(a, b)] = sim
-                sim_matrix[(b, a)] = sim
+        """Cluster agents by voting similarity using greedy agglomerative approach.
 
-        # Greedy clustering: agents with >0.7 similarity join same faction
+        Uses self._sim_matrix (precomputed once) instead of computing cosine
+        similarity independently. Also fixes misleading variable name
+        shadowing in the similarity check (previously used 'agent' as both
+        the outer loop var and the list-comprehension var).
+        """
         assigned: Dict[str, int] = {}
         fid = 0
         for agent in self.agent_names:
@@ -222,11 +254,10 @@ class DiplomacyEngine:
                 if other in assigned:
                     continue
                 # Check similarity with all current members
-                sims = [sim_matrix.get((agent, other), 0.0) for agent in members]
+                sims = [self._sim_matrix.get((member, other), 0.0) for member in members]
                 if all(s > 0.5 for s in sims):
                     members.append(other)
                     assigned[other] = fid
-            vec = self.agent_vectors[members[0]]
             avg_v = sum(sum(self.agent_vectors[m]) / len(self.agent_vectors[m]) for m in members) / len(members)
             power = sum(len(self.agent_vectors[m]) for m in members)
             self.factions.append(Faction(
@@ -239,19 +270,26 @@ class DiplomacyEngine:
             fid += 1
 
     def _compute_alliances(self) -> None:
-        """Compute bilateral alliance strength for every agent pair."""
+        """Populate alliance_matrix from precomputed similarity matrix.
+
+        Previously recomputed cosine similarity for every pair — now simply
+        reads from self._sim_matrix (O(1) per pair instead of O(vector_len)).
+        """
         for i, a in enumerate(self.agent_names):
             for j, b in enumerate(self.agent_names):
                 if i >= j:
                     continue
-                sim = _cosine_sim(self.agent_vectors[a], self.agent_vectors[b])
-                # Scale to [-1, 1]: strongly correlated = allied, anti-correlated = hostile
-                score = round(sim, 3)
+                score = round(self._sim_matrix.get((a, b), 0.0), 3)
                 self.alliance_matrix[(a, b)] = score
                 self.alliance_matrix[(b, a)] = score
 
     def _detect_treaties(self) -> None:
-        """Detect implicit treaties between factions based on non-opposition."""
+        """Detect implicit treaties between factions based on non-opposition.
+
+        Refactored: uses _faction_avg_vote helper to eliminate duplicated
+        inline computation of per-faction, per-task average votes (was
+        repeated verbatim for the full sweep and the late-task sweep).
+        """
         if len(self.factions) < 2:
             return
         for i, fa in enumerate(self.factions):
@@ -261,14 +299,8 @@ class DiplomacyEngine:
                 # Measure cross-faction agreement per task
                 agreements = 0
                 for t in range(self.n_tasks):
-                    fa_avg = sum(
-                        sum(self.vote_matrix[t][r].get(m, 0) for r in range(self.n_rounds)) / self.n_rounds
-                        for m in fa.members
-                    ) / max(len(fa.members), 1)
-                    fb_avg = sum(
-                        sum(self.vote_matrix[t][r].get(m, 0) for r in range(self.n_rounds)) / self.n_rounds
-                        for m in fb.members
-                    ) / max(len(fb.members), 1)
+                    fa_avg = self._faction_avg_vote(fa.members, t)
+                    fb_avg = self._faction_avg_vote(fb.members, t)
                     if fa_avg * fb_avg > 0:  # Same sign = agreement
                         agreements += 1
 
@@ -284,14 +316,8 @@ class DiplomacyEngine:
                     late_agreements = 0
                     late_tasks = max(1, self.n_tasks // 3)
                     for t in range(self.n_tasks - late_tasks, self.n_tasks):
-                        fa_avg = sum(
-                            sum(self.vote_matrix[t][r].get(m, 0) for r in range(self.n_rounds)) / self.n_rounds
-                            for m in fa.members
-                        ) / max(len(fa.members), 1)
-                        fb_avg = sum(
-                            sum(self.vote_matrix[t][r].get(m, 0) for r in range(self.n_rounds)) / self.n_rounds
-                            for m in fb.members
-                        ) / max(len(fb.members), 1)
+                        fa_avg = self._faction_avg_vote(fa.members, t)
+                        fb_avg = self._faction_avg_vote(fb.members, t)
                         if fa_avg * fb_avg > 0:
                             late_agreements += 1
                     if late_agreements / late_tasks < 0.4:
