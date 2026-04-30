@@ -393,94 +393,121 @@ class TraceArchaeologist:
     def __init__(self, grid: PheromoneGrid):
         self.grid = grid
 
+    # -- Shared BFS clustering ---------------------------------------------
+
+    def _bfs_clusters(
+        self,
+        seed_cells: Set[Tuple[int, int]],
+        neighbor_predicate: Optional[Any] = None,
+        min_size: int = 1,
+    ) -> List[List[Tuple[int, int]]]:
+        """BFS-cluster a set of seed cells on the toroidal grid.
+
+        Parameters
+        ----------
+        seed_cells : set of (x, y) coordinates eligible for clustering.
+        neighbor_predicate : optional callable (x, y) -> bool applied to
+            neighbors before adding them to the frontier.  If *None*, only
+            membership in *seed_cells* is checked.
+        min_size : discard clusters smaller than this.
+
+        Returns a list of clusters (each a list of (x, y) tuples).
+        """
+        size = self.grid.size
+        visited: Set[Tuple[int, int]] = set()
+        clusters: List[List[Tuple[int, int]]] = []
+
+        for cell in seed_cells:
+            if cell in visited:
+                continue
+            cluster: List[Tuple[int, int]] = []
+            queue: List[Tuple[int, int]] = [cell]
+            while queue:
+                c = queue.pop(0)
+                if c in visited:
+                    continue
+                # If a neighbor predicate is provided, apply it;
+                # otherwise require membership in seed_cells.
+                if neighbor_predicate is not None:
+                    if not neighbor_predicate(c[0], c[1]):
+                        continue
+                elif c not in seed_cells:
+                    continue
+                visited.add(c)
+                cluster.append(c)
+                cx, cy = c
+                for ndx, ndy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    nx, ny = (cx + ndx) % size, (cy + ndy) % size
+                    if (nx, ny) not in visited:
+                        queue.append((nx, ny))
+            if len(cluster) >= min_size:
+                clusters.append(cluster)
+        return clusters
+
+    # -- Public analysis methods -------------------------------------------
+
     def find_highways(self, threshold: float = 3.0) -> List[Highway]:
         """Discover high-intensity corridors (connected cells above threshold)."""
-        highways: List[Highway] = []
-        visited: Set[Tuple[int, int]] = set()
         size = self.grid.size
 
+        # Seeds: cells meeting the full threshold
+        seeds: Set[Tuple[int, int]] = set()
         for y in range(size):
             for x in range(size):
-                if (x, y) in visited:
-                    continue
-                total = self.grid.total_intensity_at(x, y)
-                if total < threshold:
-                    continue
-                # BFS to find connected high-intensity region
-                path = []
-                queue = [(x, y)]
-                while queue:
-                    cx, cy = queue.pop(0)
-                    if (cx, cy) in visited:
-                        continue
-                    if self.grid.total_intensity_at(cx, cy) < threshold * 0.5:
-                        continue
-                    visited.add((cx, cy))
-                    path.append((cx, cy))
-                    for ndx, ndy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                        nx, ny = (cx + ndx) % size, (cy + ndy) % size
-                        if (nx, ny) not in visited:
-                            queue.append((nx, ny))
+                if self.grid.total_intensity_at(x, y) >= threshold:
+                    seeds.add((x, y))
 
-                if len(path) >= 3:
-                    # Determine properties
-                    total_int = sum(self.grid.total_intensity_at(px, py) for px, py in path)
-                    agents = set()
-                    dom_types: Dict[PheromoneType, float] = defaultdict(float)
-                    for dep in self.grid.deposits:
-                        if (dep.x % size, dep.y % size) in set(path):
-                            agents.add(dep.agent_id)
-                            dom_types[dep.ptype] += dep.intensity
-                    dominant = max(dom_types, key=lambda k: dom_types[k]) if dom_types else PheromoneType.ATTRACTION
-                    highways.append(Highway(
-                        path=path,
-                        total_intensity=total_int,
-                        unique_agents=len(agents),
-                        dominant_type=dominant,
-                        persistence_ticks=len(path) * 5,  # heuristic
-                    ))
+        # BFS expands into neighbors above half-threshold (corridor edges)
+        half_thresh = threshold * 0.5
+
+        def _highway_pred(x: int, y: int) -> bool:
+            return self.grid.total_intensity_at(x, y) >= half_thresh
+
+        clusters = self._bfs_clusters(seeds, neighbor_predicate=_highway_pred, min_size=3)
+
+        highways: List[Highway] = []
+        for path in clusters:
+            total_int = sum(self.grid.total_intensity_at(px, py) for px, py in path)
+            path_set = set(path)
+            agents: Set[str] = set()
+            dom_types: Dict[PheromoneType, float] = defaultdict(float)
+            for dep in self.grid.deposits:
+                if (dep.x % size, dep.y % size) in path_set:
+                    agents.add(dep.agent_id)
+                    dom_types[dep.ptype] += dep.intensity
+            dominant = max(dom_types, key=lambda k: dom_types[k]) if dom_types else PheromoneType.ATTRACTION
+            highways.append(Highway(
+                path=path,
+                total_intensity=total_int,
+                unique_agents=len(agents),
+                dominant_type=dominant,
+                persistence_ticks=len(path) * 5,
+            ))
         return highways
 
     def find_dead_zones(self, min_cells: int = 4) -> List[DeadZone]:
         """Find regions with no pheromone activity."""
-        dead_cells: Set[Tuple[int, int]] = set()
         size = self.grid.size
+        dead_cells: Set[Tuple[int, int]] = set()
         for y in range(size):
             for x in range(size):
                 if self.grid.total_intensity_at(x, y) < 0.01:
                     dead_cells.add((x, y))
 
-        # Cluster dead cells
-        zones: List[DeadZone] = []
-        visited: Set[Tuple[int, int]] = set()
-        for cell in dead_cells:
-            if cell in visited:
-                continue
-            cluster = []
-            queue = [cell]
-            while queue:
-                c = queue.pop(0)
-                if c in visited or c not in dead_cells:
-                    continue
-                visited.add(c)
-                cluster.append(c)
-                cx, cy = c
-                for ndx, ndy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    nx, ny = (cx + ndx) % size, (cy + ndy) % size
-                    if (nx, ny) not in visited and (nx, ny) in dead_cells:
-                        queue.append((nx, ny))
+        clusters = self._bfs_clusters(dead_cells, min_size=min_cells)
 
-            if len(cluster) >= min_cells:
-                avg_x = sum(c[0] for c in cluster) / len(cluster)
-                avg_y = sum(c[1] for c in cluster) / len(cluster)
-                radius = max(math.sqrt((c[0] - avg_x) ** 2 + (c[1] - avg_y) ** 2) for c in cluster)
-                zones.append(DeadZone(
-                    center_x=int(avg_x),
-                    center_y=int(avg_y),
-                    radius=radius,
-                    cells=len(cluster),
-                    isolation_ticks=0,
-                ))
+        zones: List[DeadZone] = []
+        for cluster in clusters:
+            avg_x = sum(c[0] for c in cluster) / len(cluster)
+            avg_y = sum(c[1] for c in cluster) / len(cluster)
+            radius = max(math.sqrt((c[0] - avg_x) ** 2 + (c[1] - avg_y) ** 2) for c in cluster)
+            zones.append(DeadZone(
+                center_x=int(avg_x),
+                center_y=int(avg_y),
+                radius=radius,
+                cells=len(cluster),
+                isolation_ticks=0,
+            ))
         return zones
 
     def detect_oscillations(self, min_cycles: int = 2) -> List[Oscillation]:
