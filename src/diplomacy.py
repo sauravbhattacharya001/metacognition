@@ -247,29 +247,49 @@ class DiplomacyEngine:
                 self.alliance_matrix[(a, b)] = score
                 self.alliance_matrix[(b, a)] = score
 
+    def _faction_task_avg(self, faction_members: List[str], task_idx: int) -> float:
+        """Compute the mean vote for a faction across all rounds of a single task.
+
+        Consolidates the repeated nested-sum pattern that was inlined in both
+        the treaty detection loop and late-break check.
+        """
+        n_members = len(faction_members)
+        if n_members == 0:
+            return 0.0
+        total = sum(
+            sum(self.vote_matrix[task_idx][r].get(m, 0) for r in range(self.n_rounds))
+            for m in faction_members
+        )
+        return total / (n_members * self.n_rounds)
+
+    def _count_agreements(self, fa_members: List[str], fb_members: List[str],
+                          task_range: range) -> int:
+        """Count tasks in *task_range* where both factions vote same-sign."""
+        agreements = 0
+        for t in task_range:
+            if self._faction_task_avg(fa_members, t) * self._faction_task_avg(fb_members, t) > 0:
+                agreements += 1
+        return agreements
+
     def _detect_treaties(self) -> None:
-        """Detect implicit treaties between factions based on non-opposition."""
+        """Detect implicit treaties between factions based on non-opposition.
+
+        Refactored to use *_faction_task_avg* and *_count_agreements* helpers,
+        eliminating ~20 lines of duplicated nested-sum comprehensions that
+        previously appeared twice (full-range and late-range scans).
+        """
         if len(self.factions) < 2:
             return
         for i, fa in enumerate(self.factions):
             for j, fb in enumerate(self.factions):
                 if i >= j:
                     continue
-                # Measure cross-faction agreement per task
-                agreements = 0
-                for t in range(self.n_tasks):
-                    fa_avg = sum(
-                        sum(self.vote_matrix[t][r].get(m, 0) for r in range(self.n_rounds)) / self.n_rounds
-                        for m in fa.members
-                    ) / max(len(fa.members), 1)
-                    fb_avg = sum(
-                        sum(self.vote_matrix[t][r].get(m, 0) for r in range(self.n_rounds)) / self.n_rounds
-                        for m in fb.members
-                    ) / max(len(fb.members), 1)
-                    if fa_avg * fb_avg > 0:  # Same sign = agreement
-                        agreements += 1
 
+                # Full-range agreement ratio
+                full_range = range(self.n_tasks)
+                agreements = self._count_agreements(fa.members, fb.members, full_range)
                 ratio = agreements / max(self.n_tasks, 1)
+
                 if ratio > 0.6:
                     self.treaties.append(Treaty(
                         faction_a=fa.faction_id,
@@ -278,19 +298,9 @@ class DiplomacyEngine:
                         strength=round(ratio, 3),
                     ))
                     # Check for late breaking
-                    late_agreements = 0
                     late_tasks = max(1, self.n_tasks // 3)
-                    for t in range(self.n_tasks - late_tasks, self.n_tasks):
-                        fa_avg = sum(
-                            sum(self.vote_matrix[t][r].get(m, 0) for r in range(self.n_rounds)) / self.n_rounds
-                            for m in fa.members
-                        ) / max(len(fa.members), 1)
-                        fb_avg = sum(
-                            sum(self.vote_matrix[t][r].get(m, 0) for r in range(self.n_rounds)) / self.n_rounds
-                            for m in fb.members
-                        ) / max(len(fb.members), 1)
-                        if fa_avg * fb_avg > 0:
-                            late_agreements += 1
+                    late_range = range(self.n_tasks - late_tasks, self.n_tasks)
+                    late_agreements = self._count_agreements(fa.members, fb.members, late_range)
                     if late_agreements / late_tasks < 0.4:
                         self.treaties[-1].broken_round = self.n_tasks - late_tasks
 
