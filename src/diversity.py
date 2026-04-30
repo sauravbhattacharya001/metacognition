@@ -69,7 +69,7 @@ def simpson_diversity(weights: List[float]) -> float:
         return 0.0
     bins: Counter[int] = Counter()
     for w in weights:
-        bins[round(w, 1) * 10] += 1  # bin to nearest 0.1
+        bins[int(round(w * 10))] += 1  # bin to nearest 0.1 as integer key
     n = len(weights)
     d = sum(c * (c - 1) for c in bins.values()) / (n * (n - 1))
     return 1.0 - d
