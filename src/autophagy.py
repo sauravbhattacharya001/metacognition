@@ -265,16 +265,40 @@ class AutophagyEngine:
         self.stress_level = max(0.0, min(1.0, level))
 
     def detect(self) -> List[Dysfunction]:
-        """Run all 7 dysfunction detectors. Returns newly detected dysfunctions."""
-        new_dysfunctions: List[Dysfunction] = []
+        """Run all 7 dysfunction detectors. Returns newly detected dysfunctions.
 
-        new_dysfunctions.extend(self._detect_stale_agents())
-        new_dysfunctions.extend(self._detect_zombie_memory())
-        new_dysfunctions.extend(self._detect_circular_dependencies())
-        new_dysfunctions.extend(self._detect_metabolic_waste())
-        new_dysfunctions.extend(self._detect_senescent_agents())
-        new_dysfunctions.extend(self._detect_protein_misfolding())
-        new_dysfunctions.extend(self._detect_organelle_dysfunction())
+        Deduplicates against existing unresolved dysfunctions so the same
+        underlying problem (same category + targets) is not re-added every
+        round.  Previously only ``_detect_circular_dependencies`` guarded
+        against duplicates; the other 6 detectors would silently re-detect
+        the same stale agents, zombie memories, etc. on every call —
+        inflating counts, degrading the autophagy score, and flooding the
+        lysosome queue.
+        """
+        candidates: List[Dysfunction] = []
+
+        candidates.extend(self._detect_stale_agents())
+        candidates.extend(self._detect_zombie_memory())
+        candidates.extend(self._detect_circular_dependencies())
+        candidates.extend(self._detect_metabolic_waste())
+        candidates.extend(self._detect_senescent_agents())
+        candidates.extend(self._detect_protein_misfolding())
+        candidates.extend(self._detect_organelle_dysfunction())
+
+        # Build a set of (category, frozen-targets) for unresolved existing
+        # dysfunctions so we skip re-detecting the same underlying problem.
+        existing_keys: set = {
+            (d.category, tuple(sorted(d.targets)))
+            for d in self.dysfunctions
+            if not d.recycled
+        }
+
+        new_dysfunctions: List[Dysfunction] = []
+        for d in candidates:
+            key = (d.category, tuple(sorted(d.targets)))
+            if key not in existing_keys:
+                new_dysfunctions.append(d)
+                existing_keys.add(key)
 
         self.dysfunctions.extend(new_dysfunctions)
 
