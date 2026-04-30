@@ -260,15 +260,22 @@ class PheromoneGrid:
 
     def evaporate(self, ticks: int = 1) -> int:
         """Apply exponential decay to all pheromones. Returns count of fully evaporated cells."""
+        # Precompute decay factor per pheromone type — constant across all cells
+        decay_factors: Dict[PheromoneType, float] = {
+            pt: math.exp(-0.693 * ticks / hl)
+            for pt, hl in self.half_lives.items()
+        }
+        default_decay = math.exp(-0.693 * ticks / 20.0)
+
         evaporated = 0
         for y in range(self.size):
             for x in range(self.size):
                 cell = self._grid[y][x]
+                if not cell:
+                    continue
                 to_remove = []
                 for ptype, intensity in cell.items():
-                    half_life = self.half_lives.get(ptype, 20.0)
-                    decay = math.exp(-0.693 * ticks / half_life)
-                    new_val = intensity * decay
+                    new_val = intensity * decay_factors.get(ptype, default_decay)
                     if new_val < 0.01:
                         to_remove.append(ptype)
                         evaporated += 1
@@ -323,8 +330,32 @@ class PheromoneGrid:
 class GradientComputer:
     """Computes pheromone gradients for agent navigation."""
 
+    # Precomputed neighbor offsets keyed by sense_radius.
+    # Each entry is a list of (ddx, ddy, inv_dist, unit_dx, unit_dy) tuples
+    # for all cells within the circular radius (excluding origin).
+    _offset_cache: Dict[int, List[Tuple[int, int, float, float, float]]] = {}
+
     def __init__(self, grid: PheromoneGrid):
         self.grid = grid
+
+    @classmethod
+    def _get_offsets(cls, sense_radius: int) -> List[Tuple[int, int, float, float, float]]:
+        """Return precomputed (ddx, ddy, 1/(1+dist), unit_dx, unit_dy) for radius."""
+        if sense_radius not in cls._offset_cache:
+            offsets: List[Tuple[int, int, float, float, float]] = []
+            for ddy in range(-sense_radius, sense_radius + 1):
+                for ddx in range(-sense_radius, sense_radius + 1):
+                    if ddy == 0 and ddx == 0:
+                        continue
+                    dist = math.sqrt(ddx * ddx + ddy * ddy)
+                    if dist > sense_radius:
+                        continue
+                    inv_dist = 1.0 / (1.0 + dist)
+                    unit_dx = ddx / dist
+                    unit_dy = ddy / dist
+                    offsets.append((ddx, ddy, inv_dist, unit_dx, unit_dy))
+            cls._offset_cache[sense_radius] = offsets
+        return cls._offset_cache[sense_radius]
 
     def compute(self, x: int, y: int, sense_radius: int = 3) -> GradientVector:
         """Compute combined gradient at position considering all nearby pheromones."""
@@ -333,42 +364,32 @@ class GradientComputer:
         attractors = 0
         repulsors = 0
         type_magnitudes: Dict[PheromoneType, float] = defaultdict(float)
+        grid_size = self.grid.size
+        grid_data = self.grid._grid
+        repel_types = (PheromoneType.REPULSION, PheromoneType.DANGER)
 
-        for dy in range(-sense_radius, sense_radius + 1):
-            for ddx in range(-sense_radius, sense_radius + 1):
-                if dy == 0 and ddx == 0:
-                    continue
-                nx = (x + ddx) % self.grid.size
-                ny = (y + dy) % self.grid.size
-                dist = math.sqrt(ddx * ddx + dy * dy)
-                if dist > sense_radius:
-                    continue
+        for ddx, ddy, inv_dist, unit_dx, unit_dy in self._get_offsets(sense_radius):
+            cell = grid_data[(y + ddy) % grid_size][(x + ddx) % grid_size]
+            if not cell:
+                continue
+            for ptype, intensity in cell.items():
+                effective = intensity * inv_dist
+                type_magnitudes[ptype] += effective
 
-                cell = self.grid.read(nx, ny)
-                for ptype, intensity in cell.items():
-                    # Falloff with distance
-                    effective = intensity / (1 + dist)
-                    type_magnitudes[ptype] += effective
-
-                    # Determine direction contribution
-                    if ptype in (PheromoneType.REPULSION, PheromoneType.DANGER):
-                        # Repel: push away from source
-                        dx_total -= (ddx / dist) * effective
-                        dy_total -= (dy / dist) * effective
-                        repulsors += 1
-                    else:
-                        # Attract: pull toward source
-                        dx_total += (ddx / dist) * effective
-                        dy_total += (dy / dist) * effective
-                        attractors += 1
+                if ptype in repel_types:
+                    dx_total -= unit_dx * effective
+                    dy_total -= unit_dy * effective
+                    repulsors += 1
+                else:
+                    dx_total += unit_dx * effective
+                    dy_total += unit_dy * effective
+                    attractors += 1
 
         magnitude = math.sqrt(dx_total * dx_total + dy_total * dy_total)
-        # Normalize direction
         if magnitude > 0:
             dx_total /= magnitude
             dy_total /= magnitude
 
-        # Determine dominant type
         dominant = PheromoneType.ATTRACTION
         if type_magnitudes:
             dominant = max(type_magnitudes, key=lambda k: type_magnitudes[k])
@@ -446,6 +467,14 @@ class TraceArchaeologist:
 
     # -- Public analysis methods -------------------------------------------
 
+    def _build_deposit_index(self) -> Dict[Tuple[int, int], List[PheromoneDeposit]]:
+        """Build spatial index: (x%size, y%size) -> list of deposits."""
+        size = self.grid.size
+        index: Dict[Tuple[int, int], List[PheromoneDeposit]] = defaultdict(list)
+        for dep in self.grid.deposits:
+            index[(dep.x % size, dep.y % size)].append(dep)
+        return index
+
     def find_highways(self, threshold: float = 3.0) -> List[Highway]:
         """Discover high-intensity corridors (connected cells above threshold)."""
         size = self.grid.size
@@ -465,14 +494,16 @@ class TraceArchaeologist:
 
         clusters = self._bfs_clusters(seeds, neighbor_predicate=_highway_pred, min_size=3)
 
+        # Build deposit spatial index once — avoids O(clusters × deposits) scan
+        deposit_index = self._build_deposit_index()
+
         highways: List[Highway] = []
         for path in clusters:
             total_int = sum(self.grid.total_intensity_at(px, py) for px, py in path)
-            path_set = set(path)
             agents: Set[str] = set()
             dom_types: Dict[PheromoneType, float] = defaultdict(float)
-            for dep in self.grid.deposits:
-                if (dep.x % size, dep.y % size) in path_set:
+            for cell_coord in path:
+                for dep in deposit_index.get(cell_coord, ()):
                     agents.add(dep.agent_id)
                     dom_types[dep.ptype] += dep.intensity
             dominant = max(dom_types, key=lambda k: dom_types[k]) if dom_types else PheromoneType.ATTRACTION
