@@ -271,6 +271,8 @@ class MorphogenesisEngine:
         self.organizers.append(
             MorphogenSource(x=x, y=y, morphogen=mtype, strength=strength, decay_rate=decay_rate)
         )
+        # Invalidate cached base field so it's recomputed on next tick
+        self._base_field_cache: Optional[Dict[Tuple[int, int], Dict[str, float]]] = None
 
     def develop(self, steps: int = 100) -> None:
         """Run the developmental simulation for N steps."""
@@ -299,23 +301,51 @@ class MorphogenesisEngine:
         # 6. Update developmental stage
         self._update_stage()
 
-    def _diffuse_morphogens(self) -> None:
-        """Compute morphogen concentrations from all active sources."""
-        # Reset field
-        self.morphogen_field = defaultdict(lambda: defaultdict(float))
+    def _compute_base_field(self) -> Dict[Tuple[int, int], Dict[str, float]]:
+        """Precompute noise-free morphogen concentrations from all active sources.
 
+        This is O(organizers × grid_size²) with sqrt + exp per cell, but the
+        result is constant as long as organizers don't change.  Caching it
+        eliminates redundant recomputation on every tick.
+        """
+        base: Dict[Tuple[int, int], Dict[str, float]] = defaultdict(lambda: defaultdict(float))
         for source in self.organizers:
             if not source.active:
                 continue
-            # Compute concentration at each grid cell via exponential decay with distance
+            sx, sy, strength, decay = source.x, source.y, source.strength, source.decay_rate
+            mtype_val = source.morphogen.value
             for gx in range(self.grid_size):
+                dx = gx - sx
                 for gy in range(self.grid_size):
-                    dist = math.sqrt((gx - source.x) ** 2 + (gy - source.y) ** 2)
-                    concentration = source.strength * math.exp(-source.decay_rate * dist)
-                    # Add noise
-                    concentration += self.rng.gauss(0, self.noise_level)
-                    concentration = max(0.0, concentration)
-                    self.morphogen_field[(gx, gy)][source.morphogen.value] += concentration
+                    dy = gy - sy
+                    dist = math.sqrt(dx * dx + dy * dy)
+                    base[(gx, gy)][mtype_val] += strength * math.exp(-decay * dist)
+        return base
+
+    def _diffuse_morphogens(self) -> None:
+        """Compute morphogen concentrations from cached base field + per-tick noise.
+
+        Previously recomputed O(organizers × grid²) sqrt/exp every tick.
+        Now uses a lazily-built base field cache, adding only Gaussian noise
+        per cell per tick — reducing per-tick cost to O(grid²) additions.
+        """
+        # Lazily compute/reuse the base field (invalidated when organizers change)
+        if not hasattr(self, '_base_field_cache') or self._base_field_cache is None:
+            self._base_field_cache = self._compute_base_field()
+
+        base = self._base_field_cache
+        noise_level = self.noise_level
+        gauss = self.rng.gauss
+
+        # Build this tick's field by copying base values + noise
+        field: Dict[Tuple[int, int], Dict[str, float]] = defaultdict(lambda: defaultdict(float))
+        for coord, mtypes in base.items():
+            cell = field[coord]
+            for mtype_val, base_conc in mtypes.items():
+                noisy = base_conc + gauss(0, noise_level)
+                if noisy > 0.0:
+                    cell[mtype_val] = noisy
+        self.morphogen_field = field
 
     def _agents_sense(self) -> None:
         """Each agent records local morphogen concentrations."""
