@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import html as html_mod
 import json
 import math
 import random
@@ -362,7 +363,7 @@ def _generate_html(history: TrainingHistory) -> str:
     fitness_json = json.dumps(fitness_data)
     labels_json = json.dumps(gen_labels)
     attacks_json = json.dumps(attack_types)
-    recs_html = "".join(f"<li>{r}</li>" for r in history.recommendations)
+    recs_html = "".join(f"<li>{html_mod.escape(r)}</li>" for r in history.recommendations)
 
     # Summary stats
     total_scenarios = sum(len(g.scenarios) for g in gens)
@@ -413,7 +414,7 @@ th{{background:#1e1e2e;color:#a78bfa}}
 <div class="grid">
   <div class="card" style="grid-column:1/-1"><h2>Attack Resilience Heatmap</h2>
     <p style="color:#888;font-size:0.8rem;margin-bottom:8px">Commit rate by attack type per generation (green=resilient, red=vulnerable, gray=not tested)</p>
-    <div class="heatmap"><table><thead><tr><th>Gen</th>{''.join(f'<th>{a}</th>' for a in attack_types)}</tr></thead>
+    <div class="heatmap"><table><thead><tr><th>Gen</th>{''.join(f'<th>{html_mod.escape(a)}</th>' for a in attack_types)}</tr></thead>
     <tbody id="heatmapBody"></tbody></table></div></div>
 </div>
 <div class="card"><h2>Recommendations</h2><ul class="recs">{recs_html if recs_html else '<li>No recommendations — protocol appears robust.</li>'}</ul></div>

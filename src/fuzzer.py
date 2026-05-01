@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
+import html as html_mod
 import json
 import math
 import random
@@ -329,7 +330,7 @@ async def fuzz(
 
 def _tag(text: str, cls: str = "") -> str:
     c = " " + cls if cls else ""
-    return '<span class="tag' + c + '">' + text + '</span>'
+    return '<span class="tag' + c + '">' + html_mod.escape(text) + '</span>'
 
 
 def _generate_html(outcomes: List[FuzzOutcome], stats: FuzzerStats) -> str:
@@ -353,7 +354,7 @@ def _generate_html(outcomes: List[FuzzOutcome], stats: FuzzerStats) -> str:
     op_rows = ""
     for i in sorted(range(len(op_labels)), key=lambda x: -op_rate[x]):
         bar_w = str(op_rate[i] * 2)
-        op_rows += ("<tr><td>" + op_labels[i] + "</td><td>" + str(op_total[i])
+        op_rows += ("<tr><td>" + html_mod.escape(op_labels[i]) + "</td><td>" + str(op_total[i])
                      + "</td><td>" + str(op_interest[i])
                      + '</td><td><span class="bar" style="width:' + bar_w + 'px"></span> '
                      + str(op_rate[i]) + "%</td></tr>\n")
@@ -372,7 +373,7 @@ def _generate_html(outcomes: List[FuzzOutcome], stats: FuzzerStats) -> str:
         crash_rows = ""
         for c in crashes[:20]:
             ops_cell = "".join(_tag(o, "tag-crash") for o in c["ops"])
-            err = (c["error"] or "")[:120]
+            err = html_mod.escape((c["error"] or "")[:120])
             crash_rows += ("<tr><td>" + str(c["i"]) + "</td><td>" + ops_cell
                            + '</td><td style="color:#f85149">' + err + "</td></tr>\n")
         crash_section = ('<div class="card" style="margin-bottom:16px"><h2>💥 Crashes</h2>'

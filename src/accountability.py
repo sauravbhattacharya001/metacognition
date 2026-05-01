@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
+import html as html_mod
 import json
 import math
 import random
@@ -591,9 +592,9 @@ def _generate_html(
         chain_html += f"""
         <div class="block {committed_cls}">
             <div class="block-idx">#{e.index}</div>
-            <div class="block-hash" title="{e.entry_hash}">{short_hash}...</div>
-            <div class="block-link">← {prev_short}...</div>
-            <div class="block-leader">Leader: {rr['leader_id']}</div>
+            <div class="block-hash" title="{html_mod.escape(e.entry_hash)}">{html_mod.escape(short_hash)}...</div>
+            <div class="block-link">← {html_mod.escape(prev_short)}...</div>
+            <div class="block-leader">Leader: {html_mod.escape(rr['leader_id'])}</div>
             <div class="block-status">{'✓ COMMIT' if rr['committed'] else '✗ REJECT'}</div>
             <div class="block-weight">Agg: {rr['aggregate_weight']:.2f} / {rr['threshold']}</div>
         </div>"""
@@ -604,9 +605,9 @@ def _generate_html(
         color = severity_colors.get(f.severity, "#6b7280")
         findings_html += f"""
         <div class="finding">
-            <span class="severity-badge" style="background:{color}">{f.severity}</span>
-            <span class="finding-cat">{f.category}</span>
-            <span class="finding-desc">{f.description}</span>
+            <span class="severity-badge" style="background:{color}">{html_mod.escape(f.severity)}</span>
+            <span class="finding-cat">{html_mod.escape(f.category)}</span>
+            <span class="finding-desc">{html_mod.escape(f.description)}</span>
         </div>"""
 
     # Leader distribution for chart

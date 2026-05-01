@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import html as html_mod
 import json
 import math
 import random
@@ -431,7 +432,7 @@ def _generate_html(data: Dict[str, Any]) -> str:
     for r in rankings:
         color = "#4caf50" if r["roi"] > 0 else "#f44336" if r["roi"] < -20 else "#ff9800"
         rows_rank += f"""<tr>
-            <td>#{r['rank']}</td><td>{r['agent_id']}</td><td><b>{r['strategy']}</b></td>
+            <td>#{r['rank']}</td><td>{html_mod.escape(r['agent_id'])}</td><td><b>{html_mod.escape(r['strategy'])}</b></td>
             <td style="color:{color}">${r['final_budget']:.0f}</td>
             <td>{r['roi']:.1f}%</td><td>{r['win_rate']:.0f}%</td>
             <td>{r['total_invested']:.0f}</td><td>{r['bankruptcies']}</td></tr>"""
@@ -443,11 +444,11 @@ def _generate_html(data: Dict[str, Any]) -> str:
         rows_round += f"""<tr>
             <td>{rd['round']}</td><td>{status}</td><td>${rd['total_invested']:.0f}</td>
             <td>${rd['gdp']:.0f}</td><td>{rd['gini']:.3f}</td>
-            <td>{rd['bankrupt_count']}</td><td>{policy}</td></tr>"""
+            <td>{rd['bankrupt_count']}</td><td>{html_mod.escape(policy)}</td></tr>"""
 
     fiscal_rows = ""
     for f in fiscal:
-        fiscal_rows += f"<tr><td>{f['round']}</td><td><b>{f['action']}</b></td><td>{f['reason']}</td></tr>"
+        fiscal_rows += f"<tr><td>{f['round']}</td><td><b>{html_mod.escape(f['action'])}</b></td><td>{html_mod.escape(f['reason'])}</td></tr>"
 
     # Canvas GDP chart
     gdp_points = ""
