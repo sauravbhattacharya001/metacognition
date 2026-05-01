@@ -5,22 +5,76 @@
 ```
 metacognition/
 ├── src/
-│   ├── core/                    # Protocol engine
-│   │   ├── protocol.py          # Base mBFT consensus protocol
-│   │   ├── protocol_bayesian.py # Bayesian belief-update extension
-│   │   └── state.py             # Round state, proposal, vote models
-│   ├── agents/                  # Agent implementations
-│   │   ├── base.py              # Abstract agent interface
-│   │   └── metacognitive.py     # Metacognitive agent with confidence tracking
-│   ├── network/                 # Communication layer
-│   │   └── simulator.py         # Asyncio network simulator with fault injection
-│   ├── calibrator.py            # Calibration curve tracking and analysis
-│   ├── monitor.py               # Consensus resilience monitoring
-│   ├── partition.py             # Network partition simulation
-│   ├── replay.py                # Round replay and debugging
-│   └── trust_tracker.py         # Per-agent trust score evolution
-├── tests/                       # Test suite with Byzantine fault injection
-├── paper/                       # LaTeX source for the research paper
+│   ├── core/                        # Protocol engine
+│   │   ├── protocol.py              # Base mBFT consensus protocol
+│   │   ├── protocol_bayesian.py     # Bayesian belief-update extension
+│   │   └── state.py                 # Round state, proposal, vote models
+│   ├── agents/                      # Agent implementations
+│   │   ├── base.py                  # Abstract agent interface
+│   │   └── metacognitive.py         # Full metacognitive agent
+│   ├── network/                     # Communication layer
+│   │   └── simulator.py             # Asyncio network simulator with fault injection
+│   │
+│   │ ── Self-Regulation ──
+│   ├── homeostasis.py               # Vital-sign monitoring + corrective actions
+│   ├── autophagy.py                 # Dysfunctional agent detection + removal
+│   ├── autopilot.py                 # Autonomous parameter tuning
+│   ├── immune.py                    # Bio-inspired adversarial defense
+│   ├── circadian.py                 # Agent performance rhythms
+│   │
+│   │ ── Governance & Economics ──
+│   ├── governance.py                # Constitutional governance (amendments)
+│   ├── diplomacy.py                 # Inter-agent negotiation + alliances
+│   ├── prediction_market.py         # Internal prediction markets
+│   ├── economy.py                   # Resource budgets + fiscal policy
+│   ├── accountability.py            # Immutable audit ledger
+│   │
+│   │ ── Analysis & Forensics ──
+│   ├── forensics.py                 # Post-mortem behavioral profiling
+│   ├── deadlock.py                  # Voting cycle detection + resolution
+│   ├── lineage.py                   # Decision lineage tracing
+│   ├── trust_tracker.py             # Trust score evolution
+│   ├── calibrator.py                # Confidence calibration curves
+│   ├── monitor.py                   # Consensus resilience metrics
+│   │
+│   │ ── Bio-Inspired ──
+│   ├── morphogenesis.py             # Reaction-diffusion role differentiation
+│   ├── epigenetics.py               # Heritable behavioral marks
+│   ├── neuroplasticity.py           # Dynamic topology rewiring
+│   ├── speciation.py                # Behavioral divergence tracking
+│   ├── stigmergy.py                 # Pheromone-based indirect coordination
+│   ├── quorum_sensing.py            # Density-dependent state transitions
+│   ├── symbiosis.py                 # Agent relationship dynamics
+│   │
+│   │ ── Collective Intelligence ──
+│   ├── consciousness.py             # Collective self-awareness metrics
+│   ├── dreaming.py                  # Hypothetical scenario rehearsal
+│   ├── swarm_memory.py              # Episodic collective memory
+│   ├── quorum_predict.py            # Pre-round outcome prediction
+│   │
+│   │ ── Dynamics & Topology ──
+│   ├── grudge.py                    # Persistent inter-agent conflicts
+│   ├── influence.py                 # Influence centrality metrics
+│   ├── spectral.py                  # Spectral correlation analysis
+│   ├── emergence.py                 # Emergent behavior detection
+│   ├── landscape.py                 # Consensus fitness landscapes
+│   ├── regime.py                    # Phase transition early warnings
+│   ├── cascade.py                   # Failure cascade modeling
+│   ├── diversity.py                 # Behavioral diversity metrics
+│   ├── learning_curve.py            # Collective learning analysis
+│   ├── tournament.py                # Competitive strategy evaluation
+│   │
+│   │ ── Testing & Debugging ──
+│   ├── adversarial_trainer.py       # Attack scenario generation
+│   ├── fuzzer.py                    # Protocol fuzzing
+│   ├── partition.py                 # Network partition simulation
+│   ├── decomposer.py               # Task decomposition strategies
+│   ├── replay.py                    # Deterministic round replay
+│   └── stats_utils.py              # Shared statistical helpers
+│
+├── tests/                           # Test suite with fault injection
+├── paper/                           # LaTeX source for the research paper
+├── docs/                            # MkDocs Material documentation
 ├── requirements.txt
 └── pyproject.toml
 ```
@@ -29,7 +83,14 @@ metacognition/
 
 ### Protocol Engine (`src/core/`)
 
-The heart of mBFT. `protocol.py` implements the four-phase consensus loop. `protocol_bayesian.py` adds posterior confidence updates. `state.py` defines the data models for rounds, proposals, and votes.
+The heart of mBFT. `protocol.py` implements the four-phase consensus loop:
+
+1. **Leader Election** — Confidence-weighted selection (not round-robin)
+2. **Proposal** — Leader generates solution + proof + confidence
+3. **Verification** — Followers produce counter-proofs
+4. **Commit/Abort** — Confidence-weighted finality check
+
+`protocol_bayesian.py` adds posterior confidence updates. `state.py` defines the data models for rounds, proposals, and votes.
 
 ### Agents (`src/agents/`)
 
@@ -39,10 +100,22 @@ The heart of mBFT. `protocol.py` implements the four-phase consensus loop. `prot
 
 `simulator.py` provides an asyncio-based network simulator that supports configurable latency, message loss, reordering, and Byzantine behavior injection.
 
-### Monitoring & Analysis
+## Engine Subsystems
 
-- **`monitor.py`** — Real-time consensus health metrics (liveness, agreement rate, round duration)
-- **`calibrator.py`** — Tracks whether agents' confidence scores match their actual accuracy
-- **`trust_tracker.py`** — Evolves trust scores based on voting history
-- **`partition.py`** — Simulates network partitions for resilience testing
-- **`replay.py`** — Records and replays rounds for debugging and analysis
+The project has grown to 40+ specialized engines organized into six functional areas:
+
+| Area | Engines | Purpose |
+|------|---------|---------|
+| **Self-Regulation** | Homeostasis, Autophagy, Autopilot, Immune, Circadian | Keep the swarm stable and self-correcting |
+| **Governance** | Governance, Diplomacy, PredictionMarket, Economy, Audit | Decentralized decision-making and resources |
+| **Analysis** | Forensics, Deadlock, Lineage, Trust, Calibrator, Monitor | Deep inspection of behavior and failures |
+| **Bio-Inspired** | Morphogenesis, Epigenetics, Neuroplasticity, Speciation, Stigmergy, Quorum, Symbiosis | Biological system analogies |
+| **Collective Intelligence** | Consciousness, Dreaming, SwarmMemory, QuorumPredict | Higher-order reasoning and anticipation |
+| **Dynamics** | Grudge, Influence, Spectral, Emergence, Landscape, Regime, Cascade, Diversity, Learning, Tournament | Structural and temporal analysis |
+
+See the **[Engine Catalog](engines.md)** for detailed documentation of every engine, its module path, key classes, and purpose.
+
+## Shared Utilities
+
+- **`stats_utils.py`** — Statistical helper functions (mean, stddev, percentiles) used across engines
+- **`__init__.py`** — Package exports for clean imports

@@ -35,7 +35,8 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Getting Started: getting-started.md
   - Protocol: protocol.md
   - Architecture: architecture.md
+  - Engine Catalog: engines.md
   - API Reference: api.md
-  - Getting Started: getting-started.md
