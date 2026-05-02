@@ -67,6 +67,14 @@ jobs:
           path: coverage.xml
           retention-days: 14
 
+      - name: Upload to Codecov
+        if: matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          flags: unittests
+          fail_ci_if_error: false
+
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest

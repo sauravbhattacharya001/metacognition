@@ -1,0 +1,24 @@
+codecov:
+  require_ci_to_pass: false
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 2%
+        informational: true
+    patch:
+      default:
+        target: 80%
+        informational: true
+
+  # Ignore test files and __init__.py from coverage metrics
+  ignore:
+    - "tests/**"
+    - "**/__init__.py"
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: true

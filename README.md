@@ -1,6 +1,7 @@
 # mBFT — Metacognitive Byzantine Fault Tolerance
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![codecov](https://codecov.io/gh/sauravbhattacharya001/metacognition/branch/main/graph/badge.svg)](https://codecov.io/gh/sauravbhattacharya001/metacognition)
 
 **What if AI agents could know when they don't know?**
 
