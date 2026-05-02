@@ -122,6 +122,8 @@ class AdversarialMockAgent(BaseAgent):
             if self.attack_type == "confidence_inflation":
                 base_conf = min(1.0, base_conf + 0.3)
             elif self.attack_type == "slowloris_delay":
+                # Simulate stalling by injecting async delay
+                await asyncio.sleep(random.uniform(0.5, 2.0))
                 base_conf = max(0.05, base_conf - 0.4)
             elif self.attack_type == "chameleon_flip":
                 # Start honest-looking
@@ -158,7 +160,15 @@ class AdversarialMockAgent(BaseAgent):
         elif self.attack_type == "selective_veto":
             weight = -0.95 if leader_proposal.confidence > 0.7 else random.uniform(0.3, 0.7)
         elif self.attack_type == "coalition_block":
-            weight = -0.8
+            # Coordinated: all coalition members veto the strongest leader deterministically
+            weight = -0.95 if leader_proposal.confidence > 0.5 else -0.8
+        elif self.attack_type == "slowloris_delay":
+            # Simulate stalling at vote time too
+            await asyncio.sleep(random.uniform(0.3, 1.5))
+            weight = random.uniform(-0.4, 0.1)
+        elif self.attack_type == "sybil_flooding":
+            # Sybil agents vote to overwhelm honest consensus
+            weight = random.uniform(-0.7, -0.3)
         elif self.attack_type == "chameleon_flip":
             weight = random.uniform(-0.9, -0.5)  # flip hostile at vote time
         elif self.attack_type == "proof_spoofing":
@@ -184,6 +194,13 @@ def _make_population(size: int, difficulty_level: float) -> List[AttackScenario]
         # Scale parameters with difficulty
         byz_ratio = min(0.6, 0.05 + difficulty_level * random.uniform(0.05, 0.15))
         agent_count = random.randint(3, min(12, 4 + int(difficulty_level * 2)))
+
+        # Sybil flooding: inject extra Byzantine agents to overwhelm honest ones
+        if attack == "sybil_flooding":
+            sybil_multiplier = random.randint(2, 4)
+            agent_count = agent_count * sybil_multiplier
+            byz_ratio = min(0.8, byz_ratio * sybil_multiplier)
+
         conf_noise = min(0.3, difficulty_level * random.uniform(0.02, 0.08))
         threshold = max(0.3, 1.5 - difficulty_level * random.uniform(0.1, 0.2))
         s = AttackScenario(
