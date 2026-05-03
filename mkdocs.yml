@@ -39,4 +39,6 @@ nav:
   - Protocol: protocol.md
   - Architecture: architecture.md
   - Engine Catalog: engines.md
+  - Tuning & Operations: tuning.md
+  - Testing & Simulation: testing.md
   - API Reference: api.md

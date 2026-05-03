@@ -23,6 +23,9 @@ Byzantine fault, not a crash. mBFT replaces flat node-counting with
 
 - [Protocol Details](protocol.md)
 - [Architecture Overview](architecture.md)
+- [Engine Catalog](engines.md)
+- [Tuning & Operations](tuning.md)
+- [Testing & Simulation](testing.md)
 - [API Reference](api.md)
 - [Getting Started](getting-started.md)
 - [GitHub Repository](https://github.com/sauravbhattacharya001/metacognition)
