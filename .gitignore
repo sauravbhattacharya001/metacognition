@@ -17,3 +17,5 @@ paper/*.fdb_latexmk
 paper/*.fls
 paper/main.pdf
 dist/
+.coverage
+coverage.xml

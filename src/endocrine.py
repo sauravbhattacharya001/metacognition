@@ -667,8 +667,63 @@ class EndocrineHealthScorer:
 # Engine 7: Insight Generator
 # ---------------------------------------------------------------------------
 
+# Declarative insight rules for threshold-based hormone checks.
+# Each rule: (category, hormone, direction, threshold_multiplier, severity, escalation_multiplier, message_template)
+# direction: "above" triggers when conc > baseline * threshold, "below" when conc < baseline * threshold.
+# escalation_multiplier: if set and conc crosses baseline * escalation, severity upgrades to CRITICAL.
+_INSIGHT_RULES: List[Tuple[str, HormoneType, str, float, InsightSeverity, Optional[float], str]] = [
+    ("chronic_stress", HormoneType.CORTISOL, "above", 2.5, InsightSeverity.WARNING, 4.0,
+     "{name} at {conc:.2f} — {ratio:.1f}x baseline. Chronic stress detected."),
+    ("reward_deficiency", HormoneType.DOPAMINE, "below", 0.3, InsightSeverity.WARNING, None,
+     "{name} at {conc:.2f} — well below baseline {baseline:.2f}. Reward signaling impaired."),
+    ("bonding_gap", HormoneType.OXYTOCIN, "below", 0.3, InsightSeverity.WARNING, None,
+     "{name} at {conc:.2f} — collaboration/bonding signals are weak."),
+    ("energy_dysregulation", HormoneType.INSULIN, "above", 3.0, InsightSeverity.WARNING, None,
+     "{name} at {conc:.2f} — resource regulation may be overactive."),
+    ("growth_stall", HormoneType.GROWTH_HORMONE, "below", 0.3, InsightSeverity.INFO, None,
+     "{name} at {conc:.2f} — learning/development signals may be insufficient."),
+    ("adrenaline_surge", HormoneType.ADRENALINE, "above", 5.0, InsightSeverity.CRITICAL, None,
+     "{name} at {conc:.2f} — sustained fight-or-flight state."),
+]
+
+
 class InsightGenerator:
-    """Detects patterns and generates autonomous insights."""
+    """Detects patterns and generates autonomous insights.
+
+    Hormone-threshold insights are driven by ``_INSIGHT_RULES`` — a
+    declarative table that replaces per-hormone if/else blocks.  To add a
+    new hormone-level insight, append a tuple to the table instead of
+    writing another manual block.
+    """
+
+    @staticmethod
+    def _evaluate_hormone_rules(
+        concentrations: Dict[HormoneType, float],
+    ) -> List[Insight]:
+        """Evaluate all declarative hormone threshold rules."""
+        insights: List[Insight] = []
+        for category, hormone, direction, threshold_mul, severity, escalation_mul, msg_tpl in _INSIGHT_RULES:
+            conc = concentrations.get(hormone, 0.0)
+            baseline = HORMONE_PROFILES[hormone]["baseline"]
+            triggered = (
+                conc > baseline * threshold_mul if direction == "above"
+                else conc < baseline * threshold_mul
+            )
+            if not triggered:
+                continue
+            # Escalate severity if an escalation multiplier is defined and crossed
+            final_severity = severity
+            if escalation_mul is not None and direction == "above" and conc > baseline * escalation_mul:
+                final_severity = InsightSeverity.CRITICAL
+            ratio = conc / baseline if baseline > 0 else 0.0
+            name = hormone.value.replace("_", " ").title()
+            insights.append(Insight(
+                category=category,
+                message=msg_tpl.format(name=name, conc=conc, baseline=baseline, ratio=ratio),
+                severity=final_severity,
+                details={hormone.value: conc, "baseline": baseline},
+            ))
+        return insights
 
     @staticmethod
     def generate(
@@ -679,73 +734,8 @@ class InsightGenerator:
         health: HealthScore,
     ) -> List[Insight]:
         """Generate insights from current endocrine state."""
-        insights: List[Insight] = []
-
-        # 1. Chronic stress detection
-        cortisol = concentrations.get(HormoneType.CORTISOL, 0.0)
-        baseline_c = HORMONE_PROFILES[HormoneType.CORTISOL]["baseline"]
-        if cortisol > baseline_c * 2.5:
-            insights.append(Insight(
-                category="chronic_stress",
-                message=f"Cortisol at {cortisol:.2f} — {cortisol/baseline_c:.1f}x baseline. Chronic stress detected.",
-                severity=InsightSeverity.CRITICAL if cortisol > baseline_c * 4 else InsightSeverity.WARNING,
-                details={"cortisol": cortisol, "baseline": baseline_c},
-            ))
-
-        # 2. Reward deficiency
-        dopamine = concentrations.get(HormoneType.DOPAMINE, 0.0)
-        baseline_d = HORMONE_PROFILES[HormoneType.DOPAMINE]["baseline"]
-        if dopamine < baseline_d * 0.3:
-            insights.append(Insight(
-                category="reward_deficiency",
-                message=f"Dopamine at {dopamine:.2f} — well below baseline {baseline_d:.2f}. Reward signaling impaired.",
-                severity=InsightSeverity.WARNING,
-                details={"dopamine": dopamine, "baseline": baseline_d},
-            ))
-
-        # 3. Bonding gap
-        oxytocin = concentrations.get(HormoneType.OXYTOCIN, 0.0)
-        baseline_o = HORMONE_PROFILES[HormoneType.OXYTOCIN]["baseline"]
-        if oxytocin < baseline_o * 0.3:
-            insights.append(Insight(
-                category="bonding_gap",
-                message=f"Oxytocin at {oxytocin:.2f} — collaboration/bonding signals are weak.",
-                severity=InsightSeverity.WARNING,
-                details={"oxytocin": oxytocin, "baseline": baseline_o},
-            ))
-
-        # 4. Energy dysregulation
-        insulin = concentrations.get(HormoneType.INSULIN, 0.0)
-        baseline_i = HORMONE_PROFILES[HormoneType.INSULIN]["baseline"]
-        if insulin > baseline_i * 3.0:
-            insights.append(Insight(
-                category="energy_dysregulation",
-                message=f"Insulin at {insulin:.2f} — resource regulation may be overactive.",
-                severity=InsightSeverity.WARNING,
-                details={"insulin": insulin, "baseline": baseline_i},
-            ))
-
-        # 5. Growth stall
-        gh = concentrations.get(HormoneType.GROWTH_HORMONE, 0.0)
-        baseline_g = HORMONE_PROFILES[HormoneType.GROWTH_HORMONE]["baseline"]
-        if gh < baseline_g * 0.3:
-            insights.append(Insight(
-                category="growth_stall",
-                message=f"Growth hormone at {gh:.2f} — learning/development signals may be insufficient.",
-                severity=InsightSeverity.INFO,
-                details={"growth_hormone": gh, "baseline": baseline_g},
-            ))
-
-        # 6. Adrenaline surge
-        adrenaline = concentrations.get(HormoneType.ADRENALINE, 0.0)
-        baseline_a = HORMONE_PROFILES[HormoneType.ADRENALINE]["baseline"]
-        if adrenaline > baseline_a * 5.0:
-            insights.append(Insight(
-                category="adrenaline_surge",
-                message=f"Adrenaline at {adrenaline:.2f} — sustained fight-or-flight state.",
-                severity=InsightSeverity.CRITICAL,
-                details={"adrenaline": adrenaline, "baseline": baseline_a},
-            ))
+        # 1-6. Hormone threshold insights (data-driven)
+        insights = InsightGenerator._evaluate_hormone_rules(concentrations)
 
         # 7. Cascade runaway detection
         deep = [c for c in cascade_events if c.depth >= 3]
