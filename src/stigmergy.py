@@ -73,7 +73,7 @@ import random
 import statistics
 import sys
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -442,9 +442,9 @@ class TraceArchaeologist:
             if cell in visited:
                 continue
             cluster: List[Tuple[int, int]] = []
-            queue: List[Tuple[int, int]] = [cell]
+            queue: deque[Tuple[int, int]] = deque([cell])
             while queue:
-                c = queue.pop(0)
+                c = queue.popleft()
                 if c in visited:
                     continue
                 # If a neighbor predicate is provided, apply it;
@@ -475,22 +475,32 @@ class TraceArchaeologist:
             index[(dep.x % size, dep.y % size)].append(dep)
         return index
 
-    def find_highways(self, threshold: float = 3.0) -> List[Highway]:
+    def _intensity_matrix(self) -> List[List[float]]:
+        """Precompute total intensity for every cell — avoids repeated sum() calls."""
+        size = self.grid.size
+        grid_data = self.grid._grid
+        return [
+            [sum(grid_data[y][x].values()) if grid_data[y][x] else 0.0 for x in range(size)]
+            for y in range(size)
+        ]
+
+    def find_highways(self, threshold: float = 3.0, _intensity: Optional[List[List[float]]] = None) -> List[Highway]:
         """Discover high-intensity corridors (connected cells above threshold)."""
         size = self.grid.size
+        intensity = _intensity or self._intensity_matrix()
 
         # Seeds: cells meeting the full threshold
         seeds: Set[Tuple[int, int]] = set()
         for y in range(size):
             for x in range(size):
-                if self.grid.total_intensity_at(x, y) >= threshold:
+                if intensity[y][x] >= threshold:
                     seeds.add((x, y))
 
         # BFS expands into neighbors above half-threshold (corridor edges)
         half_thresh = threshold * 0.5
 
         def _highway_pred(x: int, y: int) -> bool:
-            return self.grid.total_intensity_at(x, y) >= half_thresh
+            return intensity[y][x] >= half_thresh
 
         clusters = self._bfs_clusters(seeds, neighbor_predicate=_highway_pred, min_size=3)
 
@@ -499,7 +509,7 @@ class TraceArchaeologist:
 
         highways: List[Highway] = []
         for path in clusters:
-            total_int = sum(self.grid.total_intensity_at(px, py) for px, py in path)
+            total_int = sum(intensity[py][px] for px, py in path)
             agents: Set[str] = set()
             dom_types: Dict[PheromoneType, float] = defaultdict(float)
             for cell_coord in path:
@@ -516,13 +526,14 @@ class TraceArchaeologist:
             ))
         return highways
 
-    def find_dead_zones(self, min_cells: int = 4) -> List[DeadZone]:
+    def find_dead_zones(self, min_cells: int = 4, _intensity: Optional[List[List[float]]] = None) -> List[DeadZone]:
         """Find regions with no pheromone activity."""
         size = self.grid.size
+        intensity = _intensity or self._intensity_matrix()
         dead_cells: Set[Tuple[int, int]] = set()
         for y in range(size):
             for x in range(size):
-                if self.grid.total_intensity_at(x, y) < 0.01:
+                if intensity[y][x] < 0.01:
                     dead_cells.add((x, y))
 
         clusters = self._bfs_clusters(dead_cells, min_size=min_cells)
@@ -573,13 +584,16 @@ class TraceArchaeologist:
 
     def full_report(self, current_tick: int) -> ArchaeologyReport:
         """Generate complete archaeology report."""
-        highways = self.find_highways()
-        dead_zones = self.find_dead_zones()
+        # Precompute intensity matrix once — shared by highways, dead_zones, and active count
+        intensity = self._intensity_matrix()
+        highways = self.find_highways(_intensity=intensity)
+        dead_zones = self.find_dead_zones(_intensity=intensity)
         oscillations = self.detect_oscillations()
 
+        # Active cell count from precomputed matrix (avoids 4th grid scan)
         active = sum(
             1 for y in range(self.grid.size) for x in range(self.grid.size)
-            if self.grid.total_intensity_at(x, y) >= 0.01
+            if intensity[y][x] >= 0.01
         )
         total_cells = self.grid.size * self.grid.size
 
