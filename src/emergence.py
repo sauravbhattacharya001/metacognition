@@ -105,19 +105,19 @@ def analyze_emergence(histories: List[List[RoundResult]]) -> EmergenceReport:
 
     # ── Voting Alignment Waves ───────────────────────────────
     # Per-round: average pairwise agreement among voters
+    # Optimized from O(V²) to O(V): if p votes are non-negative and
+    # q = n-p are negative, agree = C(p,2)+C(q,2), pairs = C(n,2).
     alignment_series = []
     for rr in all_rounds:
-        if len(rr.votes) < 2:
+        n = len(rr.votes)
+        if n < 2:
             alignment_series.append(1.0)
             continue
-        pairs, agree = 0, 0
-        for i in range(len(rr.votes)):
-            for j in range(i + 1, len(rr.votes)):
-                pairs += 1
-                # Agreement = same sign of vote weight
-                if (rr.votes[i].weight >= 0) == (rr.votes[j].weight >= 0):
-                    agree += 1
-        alignment_series.append(agree / pairs if pairs else 1.0)
+        pos = sum(1 for v in rr.votes if v.weight >= 0)
+        neg = n - pos
+        pairs = n * (n - 1) // 2
+        agree = pos * (pos - 1) // 2 + neg * (neg - 1) // 2
+        alignment_series.append(agree / pairs)
     report.alignment_timeline = alignment_series
 
     # Detect alignment waves (rolling window trend)
@@ -186,7 +186,10 @@ def analyze_emergence(histories: List[List[RoundResult]]) -> EmergenceReport:
             ))
 
     # ── Faction Detection ────────────────────────────────────
-    # Build vote vectors per agent, then cluster by agreement
+    # Build vote vectors per agent, then cluster by agreement.
+    # Optimized: pre-compute full pairwise correlation matrix once,
+    # reuse cached values for both faction assignment and cohesion
+    # calculation (avoids redundant O(V²×R) _pearson recomputation).
     agent_votes: Dict[str, List[float]] = defaultdict(list)
     for rr in all_rounds:
         for v in rr.votes:
@@ -196,35 +199,47 @@ def analyze_emergence(histories: List[List[RoundResult]]) -> EmergenceReport:
         # Pad to same length
         max_len = max(len(v) for v in agent_votes.values())
         for aid in agent_votes:
-            while len(agent_votes[aid]) < max_len:
-                agent_votes[aid].append(0.0)
+            vec = agent_votes[aid]
+            if len(vec) < max_len:
+                vec.extend([0.0] * (max_len - len(vec)))
 
         voter_ids = sorted(agent_votes.keys())
-        # Simple greedy clustering: agents with pearson > 0.5 form a faction
-        assigned = set()
+        num_voters = len(voter_ids)
+
+        # Pre-compute pairwise correlation matrix (symmetric)
+        corr_cache: Dict[Tuple[int, int], float] = {}
+        for i in range(num_voters):
+            for j in range(i + 1, num_voters):
+                corr_cache[(i, j)] = _pearson(agent_votes[voter_ids[i]], agent_votes[voter_ids[j]])
+
+        # Greedy clustering: agents with pearson > 0.5 form a faction
+        assigned: set = set()
         factions = []
-        for i, a in enumerate(voter_ids):
-            if a in assigned:
+        for i in range(num_voters):
+            if i in assigned:
                 continue
-            faction = [a]
-            assigned.add(a)
-            for j in range(i + 1, len(voter_ids)):
-                b = voter_ids[j]
-                if b in assigned:
+            faction_idx = [i]
+            assigned.add(i)
+            for j in range(i + 1, num_voters):
+                if j in assigned:
                     continue
-                corr = _pearson(agent_votes[a], agent_votes[b])
-                if corr > 0.5:
-                    faction.append(b)
-                    assigned.add(b)
-            if len(faction) >= 2:
-                # Compute cohesion
+                if corr_cache[(i, j)] > 0.5:
+                    faction_idx.append(j)
+                    assigned.add(j)
+            if len(faction_idx) >= 2:
+                # Compute cohesion from cached correlations
                 pairs_corr = []
-                for ii in range(len(faction)):
-                    for jj in range(ii + 1, len(faction)):
-                        pairs_corr.append(_pearson(agent_votes[faction[ii]], agent_votes[faction[jj]]))
+                for ii in range(len(faction_idx)):
+                    for jj in range(ii + 1, len(faction_idx)):
+                        a_idx, b_idx = faction_idx[ii], faction_idx[jj]
+                        key = (a_idx, b_idx) if a_idx < b_idx else (b_idx, a_idx)
+                        pairs_corr.append(corr_cache[key])
                 cohesion = statistics.mean(pairs_corr) if pairs_corr else 0.0
-                factions.append(FactionInfo(members=faction, cohesion=cohesion,
-                                            label=f"Faction-{len(factions)+1}"))
+                factions.append(FactionInfo(
+                    members=[voter_ids[idx] for idx in faction_idx],
+                    cohesion=cohesion,
+                    label=f"Faction-{len(factions)+1}",
+                ))
         report.factions = factions
         if len(factions) >= 2:
             report.signals.append(EmergenceSignal(
