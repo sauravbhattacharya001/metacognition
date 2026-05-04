@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine
+from src.stats_utils import gini as _gini_shared
 
 # ── Economic agent strategies ────────────────────────────────────────────
 
@@ -151,19 +152,7 @@ class FiscalPolicy:
 
 def _compute_gini(values: List[float]) -> float:
     """Compute Gini coefficient for wealth distribution."""
-    if not values or all(v == 0 for v in values):
-        return 0.0
-    sorted_v = sorted(values)
-    n = len(sorted_v)
-    total = sum(sorted_v)
-    if total == 0:
-        return 0.0
-    cumulative = 0.0
-    weighted_sum = 0.0
-    for i, v in enumerate(sorted_v):
-        cumulative += v
-        weighted_sum += (2 * (i + 1) - n - 1) * v
-    return weighted_sum / (n * total)
+    return _gini_shared(values)
 
 
 def _autonomous_fiscal_policy(market: MarketState, agents: List[EconAgent]) -> Optional[FiscalPolicy]:

@@ -37,3 +37,19 @@ def gini(values: List[float]) -> float:
         return 0.0
     numerator = sum((2 * i - n + 1) * v for i, v in enumerate(sorted_v))
     return numerator / (n * total)
+
+
+def cosine_similarity(a: List[float], b: List[float]) -> float:
+    """Cosine similarity between two equal-length vectors.
+
+    Returns 0.0 for empty, mismatched, or zero-magnitude inputs.
+    Range: [-1, 1] where 1 = identical direction, -1 = opposite.
+    """
+    if len(a) != len(b) or not a:
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b))
+    mag_a = math.sqrt(sum(x * x for x in a))
+    mag_b = math.sqrt(sum(x * x for x in b))
+    if mag_a < 1e-9 or mag_b < 1e-9:
+        return 0.0
+    return dot / (mag_a * mag_b)

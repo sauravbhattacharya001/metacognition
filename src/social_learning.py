@@ -62,6 +62,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from src.stats_utils import gini as _gini_shared
+
 
 # ---------------------------------------------------------------------------
 # Enums & Data Models
@@ -589,16 +591,8 @@ class SocialLearningEngine:
 
     def _compute_gini(self) -> float:
         """Compute Gini coefficient of knowledge distribution."""
-        counts = [len(a.skills) for a in self.agents.values()]
-        if not counts or max(counts) == 0:
-            return 0.0
-        n = len(counts)
-        counts_sorted = sorted(counts)
-        cumulative = sum((2 * (i + 1) - n - 1) * counts_sorted[i] for i in range(n))
-        total = sum(counts)
-        if total == 0:
-            return 0.0
-        return cumulative / (n * total)
+        counts = [float(len(a.skills)) for a in self.agents.values()]
+        return _gini_shared(counts)
 
     def simulate(self, steps: int = 100) -> SimulationReport:
         """Run full simulation."""

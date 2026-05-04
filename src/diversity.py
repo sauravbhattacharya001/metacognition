@@ -32,6 +32,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine
 from src.core.state import RoundResult
+from src.stats_utils import gini as _gini_shared
 
 
 # ── Diversity metrics ──────────────────────────────────────────────────────
@@ -88,17 +89,7 @@ def confidence_spread(confidences: List[float]) -> float:
 
 def gini_coefficient(values: List[float]) -> float:
     """Gini coefficient — 0 = perfectly equal, 1 = maximum inequality."""
-    if not values or all(v == 0 for v in values):
-        return 0.0
-    sorted_vals = sorted(values)
-    n = len(sorted_vals)
-    total = sum(sorted_vals)
-    cum = 0.0
-    gini_sum = 0.0
-    for v in sorted_vals:
-        cum += v
-        gini_sum += cum
-    return (2 * gini_sum) / (n * total) - (n + 1) / n
+    return _gini_shared(values)
 
 
 def herd_behavior_index(round_votes: List[List[float]]) -> float:

@@ -25,6 +25,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.stats_utils import cosine_similarity as _cosine_shared
+
 # ---------------------------------------------------------------------------
 # Domain models
 # ---------------------------------------------------------------------------
@@ -64,14 +66,7 @@ class Faction:
 # ---------------------------------------------------------------------------
 
 def _cosine_sim(a: List[float], b: List[float]) -> float:
-    if len(a) != len(b) or not a:
-        return 0.0
-    dot = sum(x * y for x, y in zip(a, b))
-    mag_a = math.sqrt(sum(x * x for x in a))
-    mag_b = math.sqrt(sum(x * x for x in b))
-    if mag_a < 1e-9 or mag_b < 1e-9:
-        return 0.0
-    return dot / (mag_a * mag_b)
+    return _cosine_shared(a, b)
 
 # ---------------------------------------------------------------------------
 # Diplomacy Engine

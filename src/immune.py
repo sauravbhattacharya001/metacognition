@@ -35,6 +35,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.stats_utils import cosine_similarity as _cosine_shared
+
 
 # ---------------------------------------------------------------------------
 # Data models
@@ -152,12 +154,7 @@ def _jaccard(a: set, b: set) -> float:
 
 
 def _cosine(a: List[float], b: List[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    mag_a = math.sqrt(sum(x * x for x in a))
-    mag_b = math.sqrt(sum(x * x for x in b))
-    if mag_a == 0 or mag_b == 0:
-        return 0.0
-    return dot / (mag_a * mag_b)
+    return _cosine_shared(a, b)
 
 
 # ---------------------------------------------------------------------------

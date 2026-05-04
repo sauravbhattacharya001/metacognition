@@ -66,6 +66,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from src.stats_utils import gini as _gini_shared
+
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -953,19 +955,7 @@ class SwarmProprioceptionEngine:
 
     def _gini_coefficient(self, values: List[float]) -> float:
         """Compute Gini coefficient for a list of values."""
-        if not values or all(v == 0 for v in values):
-            return 0.0
-        sorted_vals = sorted(values)
-        n = len(sorted_vals)
-        total = sum(sorted_vals)
-        if total == 0:
-            return 0.0
-        cumsum = 0.0
-        gini_sum = 0.0
-        for i, v in enumerate(sorted_vals):
-            cumsum += v
-            gini_sum += (2 * (i + 1) - n - 1) * v
-        return gini_sum / (n * total)
+        return _gini_shared(values)
 
     def _compute_velocity(self) -> float:
         """Compute recent movement velocity."""
