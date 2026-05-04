@@ -156,6 +156,10 @@ class PredictionMarketEngine:
         self.positions: Dict[str, Dict[str, Position]] = {}  # market_id -> agent_id -> Position
         self.trades: List[Trade] = []
         self.verdicts: Dict[str, MarketVerdict] = {}
+        # Incremental indexes — avoid O(T) full-scan in queries
+        self._market_volume: Dict[str, float] = {}        # market_id -> cumulative volume
+        self._market_traders: Dict[str, set] = {}          # market_id -> set of agent_ids
+        self._agent_markets: Dict[str, set] = {}           # agent_id -> set of market_ids traded
 
     # ── Market operations ────────────────────────────────────────────
 
@@ -239,6 +243,17 @@ class PredictionMarketEngine:
             cost=cost,
         )
         self.trades.append(t)
+
+        # Update incremental indexes
+        if market_id not in self._market_volume:
+            self._market_volume[market_id] = 0.0
+            self._market_traders[market_id] = set()
+        self._market_volume[market_id] += cost
+        self._market_traders[market_id].add(agent_id)
+        if agent_id not in self._agent_markets:
+            self._agent_markets[agent_id] = set()
+        self._agent_markets[agent_id].add(market_id)
+
         return t
 
     def resolve_market(self, market_id: str, outcome: bool) -> None:
@@ -314,28 +329,21 @@ class PredictionMarketEngine:
     def get_market_snapshot(self, market_id: str) -> MarketSnapshot:
         m = self.markets[market_id]
         p_yes, p_no = self.get_price(market_id)
-        traders = set()
-        volume = 0.0
-        for t in self.trades:
-            if t.market_id == market_id:
-                traders.add(t.agent_id)
-                volume += t.cost
+        volume = self._market_volume.get(market_id, 0.0)
+        num_traders = len(self._market_traders.get(market_id, ()))
         return MarketSnapshot(
             market_id=m.market_id,
             question=m.question,
             price_yes=round(p_yes, 4),
             price_no=round(p_no, 4),
             volume=round(volume, 2),
-            num_traders=len(traders),
+            num_traders=num_traders,
             resolved=m.resolved,
             outcome=m.outcome,
         )
 
     def get_portfolio(self, agent_id: str) -> AgentPortfolio:
-        markets_traded = set()
-        for t in self.trades:
-            if t.agent_id == agent_id:
-                markets_traded.add(t.market_id)
+        markets_traded = self._agent_markets.get(agent_id, set())
 
         total_invested = 0.0
         total_payout = 0.0
