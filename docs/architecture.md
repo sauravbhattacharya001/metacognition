@@ -21,6 +21,9 @@ metacognition/
 │   ├── autopilot.py                 # Autonomous parameter tuning
 │   ├── immune.py                    # Bio-inspired adversarial defense
 │   ├── circadian.py                 # Agent performance rhythms
+│   ├── endocrine.py                 # Hormonal signaling for global regulation
+│   ├── nociception.py               # Pain/damage signaling + protective reflex
+│   ├── senescence.py                # Agent aging and rejuvenation
 │   │
 │   │ ── Governance & Economics ──
 │   ├── governance.py                # Constitutional governance (amendments)
@@ -45,12 +48,17 @@ metacognition/
 │   ├── stigmergy.py                 # Pheromone-based indirect coordination
 │   ├── quorum_sensing.py            # Density-dependent state transitions
 │   ├── symbiosis.py                 # Agent relationship dynamics
+│   ├── angiogenesis.py              # Communication pathway growth/pruning
+│   ├── chemotaxis.py                # Chemical gradient navigation
+│   ├── mitosis.py                   # Agent replication with cell-cycle phases
+│   ├── proprioception.py            # Swarm body-schema awareness
 │   │
 │   │ ── Collective Intelligence ──
 │   ├── consciousness.py             # Collective self-awareness metrics
 │   ├── dreaming.py                  # Hypothetical scenario rehearsal
 │   ├── swarm_memory.py              # Episodic collective memory
 │   ├── quorum_predict.py            # Pre-round outcome prediction
+│   ├── social_learning.py           # Cultural evolution via social learning
 │   │
 │   │ ── Dynamics & Topology ──
 │   ├── grudge.py                    # Persistent inter-agent conflicts
@@ -70,6 +78,7 @@ metacognition/
 │   ├── partition.py                 # Network partition simulation
 │   ├── decomposer.py               # Task decomposition strategies
 │   ├── replay.py                    # Deterministic round replay
+│   ├── monitor.py                   # Consensus resilience stress-testing
 │   └── stats_utils.py              # Shared statistical helpers
 │
 ├── tests/                           # Test suite with fault injection
@@ -102,16 +111,16 @@ The heart of mBFT. `protocol.py` implements the four-phase consensus loop:
 
 ## Engine Subsystems
 
-The project has grown to 40+ specialized engines organized into six functional areas:
+The project has grown to 50+ specialized engines organized into six functional areas:
 
 | Area | Engines | Purpose |
 |------|---------|---------|
-| **Self-Regulation** | Homeostasis, Autophagy, Autopilot, Immune, Circadian | Keep the swarm stable and self-correcting |
+| **Self-Regulation** | Homeostasis, Autophagy, Autopilot, Immune, Circadian, Endocrine, Nociception, Senescence | Keep the swarm stable and self-correcting |
 | **Governance** | Governance, Diplomacy, PredictionMarket, Economy, Audit | Decentralized decision-making and resources |
 | **Analysis** | Forensics, Deadlock, Lineage, Trust, Calibrator, Monitor | Deep inspection of behavior and failures |
-| **Bio-Inspired** | Morphogenesis, Epigenetics, Neuroplasticity, Speciation, Stigmergy, Quorum, Symbiosis | Biological system analogies |
-| **Collective Intelligence** | Consciousness, Dreaming, SwarmMemory, QuorumPredict | Higher-order reasoning and anticipation |
-| **Dynamics** | Grudge, Influence, Spectral, Emergence, Landscape, Regime, Cascade, Diversity, Learning, Tournament | Structural and temporal analysis |
+| **Bio-Inspired** | Morphogenesis, Epigenetics, Neuroplasticity, Speciation, Stigmergy, Quorum, Symbiosis, Angiogenesis, Chemotaxis, Mitosis, Proprioception | Biological system analogies |
+| **Collective Intelligence** | Consciousness, Dreaming, SwarmMemory, QuorumPredict, SocialLearning | Higher-order reasoning and anticipation |
+| **Dynamics** | Grudge, Influence, Monitor, Spectral, Emergence, Landscape, Regime, Cascade, Diversity, Learning, Tournament | Structural and temporal analysis |
 
 See the **[Engine Catalog](engines.md)** for detailed documentation of every engine, its module path, key classes, and purpose.
 
