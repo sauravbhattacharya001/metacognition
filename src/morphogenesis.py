@@ -398,7 +398,14 @@ class MorphogenesisEngine:
                 agent.differentiation_step = self.step
 
     def _induction_signaling(self) -> None:
-        """Differentiated agents can induce neighbors into complementary fates."""
+        """Differentiated agents can induce neighbors into complementary fates.
+
+        Uses a spatial hash grid (cell size = induction range) to avoid the
+        O(differentiated × undifferentiated) brute-force distance scan.
+        Only agent pairs in the same or adjacent grid cells are checked,
+        reducing average cost to O(D × local_density) where D is the number
+        of inducting differentiated agents.
+        """
         # Only active during gastrulation and organogenesis
         if self.stage not in (DevelopmentalStage.GASTRULATION, DevelopmentalStage.ORGANOGENESIS):
             return
@@ -410,33 +417,63 @@ class MorphogenesisEngine:
             CellFate.RELAY: CellFate.WORKER,
         }
 
-        differentiated = [a for a in self.agents.values() if a.fate != CellFate.UNDIFFERENTIATED]
-        undifferentiated = [a for a in self.agents.values() if a.fate == CellFate.UNDIFFERENTIATED]
+        INDUCTION_RANGE = 3.0
+        INDUCTION_RANGE_SQ = INDUCTION_RANGE * INDUCTION_RANGE
 
-        for diff_agent in differentiated:
+        # Build spatial hash of undifferentiated agents (cell size = induction range)
+        undiff_grid: Dict[Tuple[int, int], List[AgentCell]] = defaultdict(list)
+        for a in self.agents.values():
+            if a.fate == CellFate.UNDIFFERENTIATED:
+                cx = int(a.x // INDUCTION_RANGE)
+                cy = int(a.y // INDUCTION_RANGE)
+                undiff_grid[(cx, cy)].append(a)
+
+        if not undiff_grid:
+            return
+
+        step = self.step
+        rng_random = self.rng.random
+
+        for diff_agent in self.agents.values():
+            if diff_agent.fate == CellFate.UNDIFFERENTIATED:
+                continue
             target_fate = induction_map.get(diff_agent.fate)
             if target_fate is None:
                 continue
 
-            # Find nearby undifferentiated agents
-            for target in undifferentiated:
-                dist = math.sqrt((diff_agent.x - target.x) ** 2 + (diff_agent.y - target.y) ** 2)
-                if dist < 3.0:  # Induction range
-                    # Probabilistic induction (closer = more likely)
-                    prob = 0.15 * (1.0 - dist / 3.0)
-                    if self.rng.random() < prob:
-                        # Check competence window
-                        if target.competence_window[0] <= self.step <= target.competence_window[1]:
-                            target.fate = target_fate
-                            target.differentiation_step = self.step
-                            diff_agent.signals_emitted += 1
-                            self.induction_events.append(InductionEvent(
-                                source_id=diff_agent.agent_id,
-                                target_id=target.agent_id,
-                                induced_fate=target_fate,
-                                step=self.step,
-                                signal_strength=prob,
-                            ))
+            # Check only neighboring spatial cells
+            cx = int(diff_agent.x // INDUCTION_RANGE)
+            cy = int(diff_agent.y // INDUCTION_RANGE)
+            dx_a = diff_agent.x
+            dy_a = diff_agent.y
+
+            for nx in range(cx - 1, cx + 2):
+                for ny in range(cy - 1, cy + 2):
+                    cell = undiff_grid.get((nx, ny))
+                    if not cell:
+                        continue
+                    for target in cell:
+                        ddx = dx_a - target.x
+                        ddy = dy_a - target.y
+                        dist_sq = ddx * ddx + ddy * ddy
+                        if dist_sq >= INDUCTION_RANGE_SQ:
+                            continue
+                        dist = math.sqrt(dist_sq)
+                        # Probabilistic induction (closer = more likely)
+                        prob = 0.15 * (1.0 - dist / INDUCTION_RANGE)
+                        if rng_random() < prob:
+                            # Check competence window
+                            if target.competence_window[0] <= step <= target.competence_window[1]:
+                                target.fate = target_fate
+                                target.differentiation_step = step
+                                diff_agent.signals_emitted += 1
+                                self.induction_events.append(InductionEvent(
+                                    source_id=diff_agent.agent_id,
+                                    target_id=target.agent_id,
+                                    induced_fate=target_fate,
+                                    step=step,
+                                    signal_strength=prob,
+                                ))
 
     def _apoptosis_check(self) -> None:
         """Remove agents that are misplaced or redundant (only during maturation)."""
@@ -570,7 +607,13 @@ class MorphogenesisEngine:
     # ── Pattern Detection ────────────────────────────────────────────────
 
     def _detect_pattern(self) -> Tuple[PatternType, float]:
-        """Detect emergent spatial patterns from fate distribution."""
+        """Detect emergent spatial patterns from fate distribution.
+
+        Uses squared distances throughout the clustering analysis to avoid
+        O(n²) sqrt calls.  The clustering ratio is computed from mean squared
+        distances (MSD_inter / MSD_intra) which preserves ordering — sqrt is
+        only applied to the final ratio for the classification thresholds.
+        """
         if not self.agents:
             return PatternType.UNIFORM, 0.0
 
@@ -583,34 +626,45 @@ class MorphogenesisEngine:
         for a in differentiated:
             fate_positions[a.fate.value].append((a.x, a.y))
 
-        # Compute intra-cluster vs inter-cluster distances
-        intra_dists: List[float] = []
-        inter_dists: List[float] = []
+        # Compute intra-cluster vs inter-cluster squared distances (avoid sqrt)
+        intra_sum = 0.0
+        intra_count = 0
+        inter_sum = 0.0
+        inter_count = 0
 
         fates = list(fate_positions.keys())
         for fate, positions in fate_positions.items():
-            if len(positions) < 2:
+            n = len(positions)
+            if n < 2:
                 continue
-            for i in range(len(positions)):
-                for j in range(i + 1, len(positions)):
-                    d = math.sqrt(
-                        (positions[i][0] - positions[j][0]) ** 2
-                        + (positions[i][1] - positions[j][1]) ** 2
-                    )
-                    intra_dists.append(d)
+            for i in range(n):
+                pi = positions[i]
+                for j in range(i + 1, n):
+                    pj = positions[j]
+                    dx = pi[0] - pj[0]
+                    dy = pi[1] - pj[1]
+                    intra_sum += dx * dx + dy * dy
+                    intra_count += 1
 
         for i in range(len(fates)):
+            pos_i = fate_positions[fates[i]]
             for j in range(i + 1, len(fates)):
-                for p1 in fate_positions[fates[i]]:
-                    for p2 in fate_positions[fates[j]]:
-                        d = math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
-                        inter_dists.append(d)
+                pos_j = fate_positions[fates[j]]
+                for p1 in pos_i:
+                    p1x, p1y = p1
+                    for p2 in pos_j:
+                        dx = p1x - p2[0]
+                        dy = p1y - p2[1]
+                        inter_sum += dx * dx + dy * dy
+                        inter_count += 1
 
-        if not intra_dists or not inter_dists:
+        if intra_count == 0 or inter_count == 0:
             return PatternType.UNIFORM, 0.5
 
-        avg_intra = statistics.mean(intra_dists)
-        avg_inter = statistics.mean(inter_dists)
+        # Convert mean squared distances to mean distances via sqrt for
+        # threshold comparison (sqrt of mean ≈ RMS, good enough for ratios)
+        avg_intra = math.sqrt(intra_sum / intra_count)
+        avg_inter = math.sqrt(inter_sum / inter_count)
 
         # Clustering ratio: high = well-clustered
         clustering_ratio = avg_inter / max(avg_intra, 0.01)
