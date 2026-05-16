@@ -164,6 +164,41 @@ print(pilot.status_summary())
 
 The Autopilot embodies the "agency" direction for mBFT — it doesn't just run consensus, it *governs* the swarm autonomously.
 
+## Swarm Health Monitor
+
+After a run, you usually want to know more than *did it commit?* — you want to know **how the swarm is behaving** and **what to tune next**. The `SwarmHealthMonitor` is a read-only observability layer that turns `engine.history` into an actionable report.
+
+```python
+from src.core.protocol import MBFTEngine
+from src.swarm_health import SwarmHealthMonitor
+
+engine = MBFTEngine(agents=..., threshold=1.5, slash_factor=0.5)
+await engine.run(task)
+
+report = SwarmHealthMonitor().analyze(
+    history=engine.history,
+    reputation=engine.reputation,
+    threshold=engine.threshold,
+    agent_ids=[a.id for a in engine.agents],
+    slash_factor=0.5,
+)
+print(report.to_markdown())   # or .to_text() / .to_json() / .to_csv()
+```
+
+What it surfaces:
+
+- **Per-agent health** — reputation, leader success rate, rejection rate, and a calibration score (does the agent's vote align with what the swarm actually commits?).
+- **Status flags** — `ok`, `watch`, `suspect`, `slashed_out`.
+- **Recommendations** — concrete, conservative suggestions: raise/lower `threshold`, soften/strengthen `slash_factor`, agents to investigate, swarm-size warnings.
+
+Quick CLI demo:
+
+```bash
+python -m src.network.health_demo --format markdown
+```
+
+The monitor is intentionally side-effect-free: it never mutates the engine. It *suggests*; the operator (or Autopilot) *decides*.
+
 ## Project Structure
 
 ```
@@ -177,6 +212,7 @@ metacognition/
 │   │   └── metacognitive.py # MockAgent + MetacognitiveAgent (LLM)
 │   ├── network/            # Async simulator
 │   ├── autopilot.py        # Consensus Autopilot — autonomous swarm governor
+│   ├── swarm_health.py     # Swarm Health Monitor — agentic observability + tuning advice
 │   ├── adversarial_trainer.py  # Red-team testing for agent swarms
 │   ├── calibrator.py       # Confidence calibration utilities
 │   ├── diversity.py        # Model diversity analysis
