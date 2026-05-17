@@ -387,7 +387,7 @@ async def main() -> None:
     if args.export == "json":
         data = json.dumps(_to_dict(report), indent=2)
         if args.output:
-            with open(args.output, "w") as f:
+            with open(args.output, "w", encoding="utf-8") as f:
                 f.write(data)
             print(f"Report written to {args.output}")
         else:
@@ -395,7 +395,7 @@ async def main() -> None:
     elif args.export == "html":
         html = _render_html(report)
         out = args.output or "resilience_report.html"
-        with open(out, "w") as f:
+        with open(out, "w", encoding="utf-8") as f:
             f.write(html)
         print(f"Interactive report written to {out}")
     else:

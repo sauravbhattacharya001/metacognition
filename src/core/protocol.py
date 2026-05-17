@@ -57,24 +57,25 @@ class MBFTEngine:
         leader = self._elect_leader(proposals, forced_leader)
         votes = await self._collect_votes(leader)
 
-        aggregate = leader.confidence * self._reputation[leader.agent_id]
-        weighted_votes: List[tuple[Vote, float]] = []
+        # Single-pass aggregation: combine reputation lookup, weighted-sum
+        # accumulation, and the unrefuted-rejection scan so each vote costs
+        # one dict lookup instead of two and no intermediate list is built.
+        # A rejection only vetoes if the voter still carries full reputation:
+        # slashed (previously-faulty) agents lose veto power but keep voice.
+        reputation = self._reputation
+        aggregate = leader.confidence * reputation[leader.agent_id]
+        has_unrefuted_rejection = False
         for v in votes:
-            effective = v.weight * self._reputation[v.voter_id]
-            aggregate += effective
-            weighted_votes.append((v, effective))
+            rep = reputation[v.voter_id]
+            aggregate += v.weight * rep
+            if v.is_rejection and rep >= 1.0:
+                has_unrefuted_rejection = True
 
-        # A rejection only vetoes if the voter still carries full reputation.
-        # Slashed (previously-faulty) agents lose veto power but keep voice.
-        has_unrefuted_rejection = any(
-            v.is_rejection and self._reputation[v.voter_id] >= 1.0
-            for v, _ in weighted_votes
-        )
         committed = aggregate >= self.threshold and not has_unrefuted_rejection
 
         slashed: List[str] = []
         if not committed:
-            self._reputation[leader.agent_id] *= self.slash_factor
+            reputation[leader.agent_id] *= self.slash_factor
             slashed.append(leader.agent_id)
 
         return RoundResult(
