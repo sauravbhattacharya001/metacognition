@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import cmath
 import html as html_mod
 import json
 import math
@@ -37,23 +38,78 @@ from typing import Any, Dict, List, Optional, Tuple
 # Minimal FFT (no numpy dependency)
 # ---------------------------------------------------------------------------
 
+# Cached twiddle-factor tables keyed by transform size. Each entry is the
+# half-length list ``[exp(-2j*pi*k/n) for k in range(n // 2)]`` reused across
+# every FFT of that size. spectral_analyze runs ``len(agent_ids) + 1`` FFTs of
+# identical length per call, so this cache eliminates the dominant cost of
+# repeatedly recomputing transcendentals.
+_TWIDDLE_CACHE: Dict[int, List[complex]] = {}
+
+
+def _twiddles(n: int) -> List[complex]:
+    """Return cached forward-FFT twiddle factors for length ``n`` (power of 2)."""
+    tw = _TWIDDLE_CACHE.get(n)
+    if tw is not None:
+        return tw
+    half = n >> 1
+    step = -2.0 * math.pi / n
+    tw = [cmath.exp(complex(0.0, step * k)) for k in range(half)]
+    _TWIDDLE_CACHE[n] = tw
+    return tw
+
+
 def _fft(x: List[complex]) -> List[complex]:
-    """Radix-2 Cooley-Tukey FFT. Pads to next power of 2."""
-    n = len(x)
-    if n <= 1:
+    """Iterative radix-2 Cooley-Tukey FFT. Pads to next power of 2.
+
+    Equivalent to the previous recursive implementation but runs in-place on
+    a single list with cached twiddle factors. Avoids the O(log n) layers of
+    list slicing/allocation and the per-call ``math.e ** (...)`` evaluation
+    that dominated runtime on signals of a few hundred samples.
+    """
+    n_in = len(x)
+    if n_in <= 1:
         return list(x)
-    p = 1
-    while p < n:
-        p <<= 1
-    x = list(x) + [0j] * (p - n)
-    n = p
-    if n == 1:
-        return x
-    even = _fft(x[0::2])
-    odd = _fft(x[1::2])
-    T = [math.e ** (-2j * math.pi * k / n) * odd[k] for k in range(n // 2)]
-    return [even[k] + T[k] for k in range(n // 2)] + \
-           [even[k] - T[k] for k in range(n // 2)]
+
+    # Round up to the next power of two.
+    n = 1
+    while n < n_in:
+        n <<= 1
+
+    # Copy + zero-pad into a working buffer we mutate in place.
+    a: List[complex] = list(x)
+    if n != n_in:
+        a.extend([0j] * (n - n_in))
+
+    # Bit-reversal permutation (Gold-Rader). O(n) and branch-light.
+    j = 0
+    for i in range(1, n):
+        bit = n >> 1
+        while j & bit:
+            j ^= bit
+            bit >>= 1
+        j ^= bit
+        if i < j:
+            a[i], a[j] = a[j], a[i]
+
+    # Iterative butterflies using cached twiddles for the full length.
+    full_tw = _twiddles(n)
+    size = 2
+    while size <= n:
+        half = size >> 1
+        # Stride into the full twiddle table so we reuse one cached table
+        # rather than building per-stage tables.
+        stride = n // size
+        for start in range(0, n, size):
+            tw_idx = 0
+            for k in range(start, start + half):
+                t = full_tw[tw_idx] * a[k + half]
+                u = a[k]
+                a[k] = u + t
+                a[k + half] = u - t
+                tw_idx += stride
+        size <<= 1
+
+    return a
 
 
 def power_spectrum(signal: List[float]) -> Tuple[List[float], List[float]]:
