@@ -163,6 +163,43 @@ print(pilot.status_summary())
 
 The Autopilot embodies the "agency" direction for mBFT — it doesn't just run consensus, it *governs* the swarm autonomously.
 
+## Consensus Forecaster
+
+Most observability tools look *backwards* ("how did the last N rounds go?"). The `ConsensusForecaster` looks *forward*: given `engine.history` plus the current reputation map and config, it predicts what's about to happen in the next mBFT round before it executes, and recommends pre-round interventions so you can fix problems *before* paying another slash.
+
+```python
+from src.core.protocol import MBFTEngine
+from src.consensus_forecaster import ConsensusForecaster
+
+engine = MBFTEngine(agents=..., threshold=1.5, slash_factor=0.5)
+await engine.run(task)
+
+forecast = ConsensusForecaster().forecast(
+    history=engine.history,
+    reputation=engine.reputation,
+    threshold=engine.threshold,
+    slash_factor=engine.slash_factor,
+    agent_ids=[a.id for a in engine.agents],
+)
+print(forecast.to_markdown())   # or .to_text() / .to_json()
+```
+
+What it predicts:
+
+- **Predicted leader** plus a softmax-ranked candidate list with per-agent `p(lead)`.
+- **Aggregate weight** — point estimate plus a low/high spread.
+- **Commit probability** combining margin-vs-θ (logistic) with the chance of an unrefuted full-reputation rejection.
+- **Likely rejectors** — full-reputation agents likely to veto the upcoming round.
+- **P0/P1/P2/P3 interventions** — pause a chronic vetoer, nudge θ down when the aggregate hovers just under it, raise `slash_factor` when rejection risk is high, add fresh agents, or swap to a stronger leader — each tagged with an approximate Δp(commit).
+
+Quick CLI demo:
+
+```bash
+python -m src.network.forecast_demo --format markdown
+```
+
+Like `Autopilot`, the forecaster is read-only and deterministic — same inputs always produce the same output. It *suggests*; the operator (or Autopilot) *decides*.
+
 ## Project Structure
 
 ```
@@ -176,6 +213,7 @@ metacognition/
 │   │   └── metacognitive.py # MockAgent + MetacognitiveAgent (LLM)
 │   ├── network/            # Async simulator
 │   ├── autopilot.py        # Consensus Autopilot — autonomous swarm governor
+│   ├── consensus_forecaster.py # Consensus Forecaster — next-round prediction + pre-round interventions
 │   ├── adversarial_trainer.py  # Red-team testing for agent swarms
 │   ├── calibrator.py       # Confidence calibration utilities
 │   ├── diversity.py        # Model diversity analysis
