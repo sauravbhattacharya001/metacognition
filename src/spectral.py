@@ -158,7 +158,15 @@ async def _run_spectral_sim(
 # ---------------------------------------------------------------------------
 
 def analyze_spectral(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Perform spectral analysis on collected voting data."""
+    """Perform spectral analysis on collected voting data.
+
+    Performance: the per-agent FFT/power-spectrum and phase angles are computed
+    exactly once per agent and reused for the oscillator scan, phase-coherence
+    matrix, and fleet spectrogram. An earlier implementation re-ran
+    ``power_spectrum`` (and the underlying recursive FFT) three times per agent
+    plus an additional ``phase_angles`` FFT, which dominated runtime on large
+    fleets. This is now O(agents) FFTs total instead of ~4*agents.
+    """
     agent_ids = data["agent_ids"]
     voting_series = data["voting_series"]
     aggregate_series = data["aggregate_series"]
@@ -174,9 +182,29 @@ def analyze_spectral(data: Dict[str, Any]) -> Dict[str, Any]:
         "recommendations": [],
     }
 
+    # Compute one FFT per agent and derive freqs/power/phases from it.
+    # The previous implementation re-ran power_spectrum / phase_angles up to
+    # four times per agent. This consolidates them into a single pass.
+    per_agent: Dict[str, Dict[str, Any]] = {}
     for aid in agent_ids:
         series = voting_series[aid]
-        freqs, pwr = power_spectrum(series)
+        n = len(series)
+        if n < 2:
+            per_agent[aid] = {"freqs": [], "power": [], "phases": []}
+            continue
+        mean = sum(series) / n
+        centered = [complex(v - mean) for v in series]
+        F = _fft(centered)
+        N = len(F)
+        half = N // 2
+        freqs = [k / N for k in range(half)]
+        power = [(F[k].real ** 2 + F[k].imag ** 2) / N for k in range(half)]
+        phases = [math.atan2(F[k].imag, F[k].real) for k in range(half)]
+        per_agent[aid] = {"freqs": freqs, "power": power, "phases": phases}
+
+    for aid in agent_ids:
+        cached = per_agent[aid]
+        freqs, pwr = cached["freqs"], cached["power"]
         if not freqs:
             continue
 
@@ -209,20 +237,21 @@ def analyze_spectral(data: Dict[str, Any]) -> Dict[str, Any]:
                 "is_byzantine": aid in byz_ids,
             })
 
-    # Phase coherence
+    # Phase coherence (reuses cached per-agent FFT — no recomputation).
     phases_at_dom: Dict[str, float] = {}
     for aid in agent_ids:
-        series = voting_series[aid]
-        ph = phase_angles(series)
-        if ph:
-            ag = results["agents"].get(aid)
-            if ag:
-                dom_idx = 0
-                freqs, pwr = power_spectrum(series)
-                if pwr:
-                    dom_idx = max(range(len(pwr)), key=lambda i: pwr[i])
-                if dom_idx < len(ph):
-                    phases_at_dom[aid] = ph[dom_idx]
+        cached = per_agent.get(aid)
+        if not cached:
+            continue
+        ph = cached["phases"]
+        pwr = cached["power"]
+        if not ph or not pwr:
+            continue
+        if results["agents"].get(aid) is None:
+            continue
+        dom_idx = max(range(len(pwr)), key=lambda i: pwr[i])
+        if dom_idx < len(ph):
+            phases_at_dom[aid] = ph[dom_idx]
 
     aids_with_phase = list(phases_at_dom.keys())
     for i in range(len(aids_with_phase)):
@@ -288,14 +317,16 @@ def analyze_spectral(data: Dict[str, Any]) -> Dict[str, Any]:
             ],
         }
 
-    # Fleet spectrogram
-    all_freqs = None
-    spec_data = {}
+    # Fleet spectrogram (reuses cached per-agent FFT — no recomputation).
+    all_freqs: Optional[List[float]] = None
+    spec_data: Dict[str, List[float]] = {}
     for aid in agent_ids:
-        freqs, pwr = power_spectrum(voting_series[aid])
+        cached = per_agent.get(aid)
+        if not cached:
+            continue
         if all_freqs is None:
-            all_freqs = freqs
-        spec_data[aid] = pwr
+            all_freqs = cached["freqs"]
+        spec_data[aid] = cached["power"]
     results["fleet_spectrogram"] = {
         "frequencies": [round(f, 4) for f in (all_freqs or [])],
         "agents": {aid: [round(p, 4) for p in pwr] for aid, pwr in spec_data.items()},
