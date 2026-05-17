@@ -469,19 +469,24 @@ class SwarmDreamEngine:
             self._journal = journal
             return journal
 
-        start = time.time()
+        # Use perf_counter for sub-millisecond elapsed-time measurement. time.time()
+        # has ~15.6 ms granularity on Windows, which collapsed every fast dream
+        # phase to 0.0 ms and made total_duration_ms == 0 (see test_dreaming.py::
+        # test_total_duration_positive). perf_counter is the right tool for
+        # measuring elapsed wall time of code paths regardless of platform.
+        start = time.perf_counter()
 
         for cycle_id in range(cycles):
             cycle = DreamCycle(cycle_id=cycle_id)
 
             # Phase 1: Replay
-            t0 = time.time()
+            t0 = time.perf_counter()
             # Select subset for replay (prioritize recent + high-signal)
             replay_set = self._select_replay_set(all_episodes)
             replays = self._replay.replay(replay_set, self.rng)
             phase_replay = DreamPhase(
                 phase_type="replay",
-                duration_ms=(time.time() - t0) * 1000,
+                duration_ms=(time.perf_counter() - t0) * 1000,
                 inputs_processed=len(replay_set),
                 outputs_generated=len(replays),
                 details={"robust_count": sum(1 for r in replays if r["robust"])},
@@ -489,11 +494,11 @@ class SwarmDreamEngine:
             cycle.phases.append(phase_replay)
 
             # Phase 2: Consolidation
-            t0 = time.time()
+            t0 = time.perf_counter()
             schemas = self._consolidation.consolidate(all_episodes)
             phase_consolidation = DreamPhase(
                 phase_type="consolidation",
-                duration_ms=(time.time() - t0) * 1000,
+                duration_ms=(time.perf_counter() - t0) * 1000,
                 inputs_processed=len(all_episodes),
                 outputs_generated=len(schemas),
             )
@@ -501,7 +506,7 @@ class SwarmDreamEngine:
             cycle.schemas_produced = schemas
 
             # Phase 3: Creative Recombination
-            t0 = time.time()
+            t0 = time.perf_counter()
             hypotheses = self._recombination.recombine(
                 self.memory.successes(), self.rng
             )
@@ -509,7 +514,7 @@ class SwarmDreamEngine:
             hypotheses = [h for h in hypotheses if h.lucidity >= self.lucidity_threshold]
             phase_recombination = DreamPhase(
                 phase_type="recombination",
-                duration_ms=(time.time() - t0) * 1000,
+                duration_ms=(time.perf_counter() - t0) * 1000,
                 inputs_processed=len(self.memory.successes()),
                 outputs_generated=len(hypotheses),
             )
@@ -517,11 +522,11 @@ class SwarmDreamEngine:
             cycle.hypotheses_produced = hypotheses
 
             # Phase 4: Anticipatory Planning
-            t0 = time.time()
+            t0 = time.perf_counter()
             anticipations = self._anticipation.anticipate(all_episodes)
             phase_anticipation = DreamPhase(
                 phase_type="anticipation",
-                duration_ms=(time.time() - t0) * 1000,
+                duration_ms=(time.perf_counter() - t0) * 1000,
                 inputs_processed=len(all_episodes),
                 outputs_generated=len(anticipations),
             )
@@ -558,7 +563,7 @@ class SwarmDreamEngine:
                 h.lucidity for h in journal.hypotheses
             )
 
-        journal.total_duration_ms = (time.time() - start) * 1000
+        journal.total_duration_ms = (time.perf_counter() - start) * 1000
         self._journal = journal
         return journal
 
