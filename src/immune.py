@@ -29,9 +29,8 @@ import hashlib
 import json
 import math
 import random
-import sys
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -637,7 +636,7 @@ def generate_immune_report(system: ImmuneSystem) -> str:
     # Antibody rows
     antibody_rows = ""
     for ab in antibodies:
-        eff_pct = ab.effectiveness * 100
+        ab.effectiveness * 100
         antibody_rows += f"""<tr>
             <td>{ab.antibody_id[:8]}</td>
             <td>{ab.rule_type}</td>

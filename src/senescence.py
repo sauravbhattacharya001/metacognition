@@ -52,12 +52,11 @@ import json
 import math
 import random
 import statistics
-import sys
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -833,9 +832,9 @@ class SwarmSenescenceEngine:
             state_counts[a.state.value] += 1
 
         # Cycle chart data
-        cycle_labels = [str(c["cycle"]) for c in report.cycle_history[::5]]
-        telomere_data = [c["avg_telomere"] for c in report.cycle_history[::5]]
-        senescent_data = [c["senescent_count"] for c in report.cycle_history[::5]]
+        [str(c["cycle"]) for c in report.cycle_history[::5]]
+        [c["avg_telomere"] for c in report.cycle_history[::5]]
+        [c["senescent_count"] for c in report.cycle_history[::5]]
 
         html_content = f"""<!DOCTYPE html>
 <html lang="en">

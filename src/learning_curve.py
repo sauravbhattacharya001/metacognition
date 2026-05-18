@@ -17,13 +17,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import math
 import random
 import statistics
-import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Tuple
 
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine

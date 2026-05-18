@@ -66,11 +66,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import random
-import sys
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -383,7 +381,7 @@ class AutophagyEngine:
 
         # Factors that reduce score
         penalties = 0.0
-        total_agents = len(self.agent_history)
+        len(self.agent_history)
 
         # Pending queue items
         queue_penalty = min(30.0, len(self.lysosome_queue) * 5.0)

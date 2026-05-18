@@ -12,11 +12,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import html
 import json
-import math
 import random
-import sys
 from collections import defaultdict
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional, Tuple
@@ -275,7 +272,7 @@ class ConsensusLineageTracker:
         conv = data["convergence"]
         influence = data["agent_influence"]
         chain_ids = {n.proposal.proposal_id for n in self.winning_chain()}
-        innovations = [n for n in data["nodes"] if n["innovation"]]
+        [n for n in data["nodes"] if n["innovation"]]
 
         # Assign colors per agent
         agents = sorted({n["agent"] for n in data["nodes"]})
@@ -489,7 +486,7 @@ def _build_agents(n_agents: int, n_byzantine: int) -> list[MockAgent]:
         "Use iterative refinement with reputation-gated veto power",
     ]
     agents: list[MockAgent] = []
-    honest_answer = solutions[0]
+    solutions[0]
     for i in range(n_agents):
         is_byz = i >= (n_agents - n_byzantine)
         aid = f"agent-{i}"
@@ -525,7 +522,7 @@ def main(argv: list[str] | None = None) -> None:
 
     agents = _build_agents(args.agents, args.byzantine)
     engine = InstrumentedEngine(agents, args.threshold, max_rounds=args.rounds)
-    result = asyncio.run(engine.run(args.task))
+    asyncio.run(engine.run(args.task))
 
     tracker = ConsensusLineageTracker(similarity_threshold=args.similarity)
     tracker.build(engine, engine.history)

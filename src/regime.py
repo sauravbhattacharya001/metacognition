@@ -38,15 +38,12 @@ import argparse
 import asyncio
 import html as html_mod
 import json
-import math
 import os
 import random
 import statistics
-import sys
-import time
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine
@@ -500,7 +497,7 @@ def generate_html(report: RegimeReport) -> str:
         cells = ""
         for r_to in REGIMES:
             val = report.transition_matrix.get(r_from, {}).get(r_to, 0.0)
-            intensity = int(val * 255)
+            int(val * 255)
             bg = f"rgba(99,102,241,{val:.2f})"
             cells += f'<td style="background:{bg};text-align:center">{val:.2f}</td>'
         tm_rows += f'<tr><td><strong>{REGIME_ICONS.get(r_from, "")} {r_from}</strong></td>{cells}</tr>'

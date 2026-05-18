@@ -18,9 +18,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import math
 import random
-import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from itertools import combinations
@@ -29,7 +27,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .agents.metacognitive import MockAgent
 from .core.protocol import MBFTEngine
 from .stats_utils import pearson as _pearson
-from .core.state import RoundResult, Vote
+from .core.state import RoundResult
 
 
 # ---------------------------------------------------------------------------
@@ -616,7 +614,7 @@ async def _run_scenario(
 
     random.shuffle(agents)
     engine = MBFTEngine(agents, threshold=threshold, max_rounds=max_rounds)
-    result = await engine.run("deadlock_detection_probe")
+    await engine.run("deadlock_detection_probe")
 
     detector = DeadlockDetector(engine.history, [a.id for a in agents])
     report = detector.analyze()

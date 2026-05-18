@@ -71,10 +71,8 @@ import json
 import math
 import random
 import statistics
-import sys
-import time
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -595,7 +593,7 @@ class TraceArchaeologist:
             1 for y in range(self.grid.size) for x in range(self.grid.size)
             if intensity[y][x] >= 0.01
         )
-        total_cells = self.grid.size * self.grid.size
+        self.grid.size * self.grid.size
 
         # Diversity: Shannon entropy of type distribution
         dist = self.grid.type_distribution()

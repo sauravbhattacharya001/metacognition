@@ -37,8 +37,8 @@ Design notes:
 from __future__ import annotations
 
 import json
-from collections import Counter, defaultdict
-from typing import Dict, List, Optional, Sequence
+from collections import Counter
+from typing import List, Optional, Sequence
 
 from pydantic import BaseModel, Field
 

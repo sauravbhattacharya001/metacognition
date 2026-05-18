@@ -24,13 +24,12 @@ import copy
 import json
 import math
 import re
-from collections import Counter
 from datetime import datetime, timezone
 from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from pydantic import BaseModel, Field
 
-from src.core.state import Proposal, RoundResult, Vote
+from src.core.state import Proposal, RoundResult
 
 __all__ = [
     "RiskFactor",

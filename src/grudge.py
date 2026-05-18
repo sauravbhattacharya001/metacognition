@@ -21,12 +21,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import math
 import random
-import sys
-from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from src.core.protocol import MBFTEngine
 from src.core.state import RoundResult
@@ -163,7 +160,7 @@ class GrudgeEngine:
             )
 
             task = f"scenario_{scenario}_task"
-            result = await engine.run(task)
+            await engine.run(task)
 
             # Process round results into interactions
             for rr in engine.history:
@@ -311,9 +308,7 @@ class GrudgeEngine:
             }
 
         # Stability analysis
-        final_snap = self.snapshots[-1] if self.snapshots else {}
         n_grudge_pairs = len(grudges)
-        n_alliance_pairs = len(alliances)
         total_pairs = self.n_agents * (self.n_agents - 1)
         stability = 1.0 - (n_grudge_pairs / max(total_pairs, 1))
 
@@ -378,11 +373,6 @@ def generate_html_report(results: Dict) -> str:
     for i, a in enumerate(agents):
         for j, b in enumerate(agents):
             heatmap_data.append({"x": j, "y": i, "v": matrix[a][b]})
-
-    profiles_json = json.dumps(results["profiles"], indent=2)
-    grudges_json = json.dumps(results["grudges"], indent=2)
-    alliances_json = json.dumps(results["alliances"], indent=2)
-    recommendations_html = "".join(f"<li>{r}</li>" for r in results["recommendations"])
 
     # Timeline data for chart
     timeline_data = []

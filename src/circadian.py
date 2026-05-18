@@ -76,11 +76,10 @@ import json
 import math
 import random
 import statistics
-import sys
-from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from collections import defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -876,9 +875,6 @@ class CircadianEngine:
         self, report: CollectiveReport, agents_data: List[Dict]
     ) -> str:
         """Render HTML dashboard string."""
-        agents_json = json.dumps(agents_data, indent=2)
-        report_json = json.dumps(asdict(report), indent=2)
-
         return f"""<!DOCTYPE html>
 <html lang="en">
 <head>

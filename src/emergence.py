@@ -19,12 +19,10 @@ import asyncio
 import argparse
 import html
 import json
-import math
 import statistics
-import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from src.core.state import RoundResult
 from src.stats_utils import gini as _gini, pearson as _pearson
@@ -146,7 +144,6 @@ def analyze_emergence(histories: List[List[RoundResult]]) -> EmergenceReport:
     # ── Reputation Convergence/Divergence ────────────────────
     # Track reputation variance across runs
     rep_snapshots: List[Dict[str, float]] = []
-    from src.core.protocol import MBFTEngine
     # We reconstruct rep from slash history
     rep = defaultdict(lambda: 1.0)
     for rr in all_rounds:

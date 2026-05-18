@@ -57,7 +57,7 @@ from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, 
 
 from pydantic import BaseModel, Field
 
-from src.core.state import RoundResult, Vote
+from src.core.state import RoundResult
 
 
 # ---------------------------------------------------------------------------

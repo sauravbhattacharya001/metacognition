@@ -65,12 +65,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import random
-import statistics
-import sys
 import time
-from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -708,7 +704,7 @@ def _generate_dashboard_html(ctrl: HomeostasisController, report: HealthReport) 
         info = report.per_vital.get(name, {})
         status = info.get("status", "no_data")
         value = info.get("value", "—")
-        error = info.get("error", 0)
+        info.get("error", 0)
         v_score = info.get("score", 50)
         status_color = {"ok": "#4caf50", "warning": "#ff9800", "critical": "#f44336"}.get(status, "#999")
         sparkline_data = [r.value for r in ctrl.vital_history.get(name, [])[-30:]]
@@ -882,7 +878,7 @@ def _simulate(cycles: int = 50, perturbation: bool = False) -> HomeostasisContro
             "quorum_margin": margin,
         })
 
-        adjustments = ctrl.compute_adjustments()
+        ctrl.compute_adjustments()
         mode = ctrl.get_mode()
 
         if i % 10 == 0 or mode != "normal":

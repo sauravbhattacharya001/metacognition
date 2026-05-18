@@ -64,13 +64,11 @@ import json
 import math
 import random
 import statistics
-import sys
-import time
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 # ── Enums ────────────────────────────────────────────────────────────────
@@ -518,7 +516,7 @@ class MorphogenesisEngine:
         """Progress through developmental stages based on swarm state."""
         prev_stage = self.stage
         diff_ratio = self._differentiation_ratio()
-        n_agents = len(self.agents)
+        len(self.agents)
 
         if self.stage == DevelopmentalStage.ZYGOTE and self.step >= 5:
             self.stage = DevelopmentalStage.CLEAVAGE

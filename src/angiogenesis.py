@@ -66,15 +66,13 @@ from __future__ import annotations
 import argparse
 import html as html_mod
 import json
-import math
 import random
 import statistics
-import sys
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 # ---------------------------------------------------------------------------

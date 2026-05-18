@@ -22,12 +22,11 @@ import argparse
 import asyncio
 import html as html_mod
 import json
-import math
 import random
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine
@@ -411,7 +410,7 @@ def _generate_html(data: Dict[str, Any]) -> str:
     # GDP sparkline data
     gdp_values = [r["gdp"] for r in rounds]
     gini_values = [r["gini"] for r in rounds]
-    max_gdp = max(gdp_values) if gdp_values else 1
+    max(gdp_values) if gdp_values else 1
 
     def bar(val: float, mx: float, color: str = "#4fc3f7") -> str:
         pct = (val / mx * 100) if mx else 0

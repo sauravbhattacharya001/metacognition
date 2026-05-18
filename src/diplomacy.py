@@ -13,15 +13,12 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import asyncio
 import html as html_mod
 import json
 import math
-import os
 import random
-import sys
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 

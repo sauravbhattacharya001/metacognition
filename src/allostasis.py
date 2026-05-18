@@ -78,10 +78,8 @@ import json
 import math
 import random
 import statistics
-import sys
-import time
 from collections import deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -701,7 +699,7 @@ class SwarmAllostasisEngine:
         self.load.adjustment_frequency = min(1.0, self.load.adjustment_frequency)
 
         # False alarm rate
-        recent_fa = list(self._false_alarm_window)[-20:]
+        list(self._false_alarm_window)[-20:]
         total_preds = sum(m.predictions_made for m in self.models.values())
         if total_preds > 0:
             total_fa = sum(m.false_alarms for m in self.models.values())

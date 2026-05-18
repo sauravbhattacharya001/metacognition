@@ -55,12 +55,11 @@ import json
 import math
 import random
 import statistics
-import sys
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -636,7 +635,7 @@ class SwarmHibernationEngine:
             arousal_responsiveness = min(1.0, arousal_responsiveness + 0.2)
 
         # Cluster utilization
-        active_clusters = [c for c in self._clusters if c.is_active]
+        [c for c in self._clusters if c.is_active]
         torpid_agents = [
             a for a in self._agents
             if a.state in (HibernationState.LIGHT_TORPOR, HibernationState.DEEP_TORPOR)
@@ -924,9 +923,9 @@ class SwarmHibernationEngine:
 
         # Cycle chart data (sample every 5 cycles)
         step = max(1, len(report.cycle_history) // 30)
-        cycle_labels = [str(c["cycle"]) for c in report.cycle_history[::step]]
-        energy_data = [c["avg_energy"] for c in report.cycle_history[::step]]
-        torpid_data = [c["torpid_count"] for c in report.cycle_history[::step]]
+        [str(c["cycle"]) for c in report.cycle_history[::step]]
+        [c["avg_energy"] for c in report.cycle_history[::step]]
+        [c["torpid_count"] for c in report.cycle_history[::step]]
 
         # Cluster summary
         active_clusters = [c for c in report.clusters if c.is_active]

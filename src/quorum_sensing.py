@@ -71,12 +71,11 @@ import json
 import math
 import random
 import statistics
-import sys
 import time
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 # ---------------------------------------------------------------------------
@@ -566,7 +565,7 @@ td {{ font-size: 0.9em; }}
             # Show threshold line
             for bp in self._behaviors.values():
                 if bp.channel == name:
-                    thresh_row = int((bp.threshold / max_val) * height) if max_val > 0 else 0
+                    int((bp.threshold / max_val) * height) if max_val > 0 else 0
                     lines.append(f"  ↑ Threshold '{bp.name}': {bp.threshold:.1f}")
             lines.append("")
         return "\n".join(lines)

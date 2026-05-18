@@ -31,7 +31,6 @@ import json
 import math
 import os
 import sys
-from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
@@ -188,7 +187,7 @@ async def _run_spectral_sim(
         engine = MBFTEngine(agents, threshold=threshold, max_rounds=num_rounds)
         task_prompt = f"spectral_task_{t}_{rng.randint(0,9999)}"
 
-        result = await engine.run(task_prompt)
+        await engine.run(task_prompt)
 
         for rr in engine.history:
             vote_map = {v.voter_id: v.weight for v in rr.votes}
@@ -425,8 +424,8 @@ def generate_html_report(data: Dict[str, Any], analysis: Dict[str, Any]) -> str:
     agents_json = json.dumps(analysis["agents"], indent=2)
     spectrogram_json = json.dumps(analysis["fleet_spectrogram"])
     coherence_json = json.dumps(analysis["phase_coherence"])
-    oscillators_json = json.dumps(analysis["oscillators"])
-    resonance_json = json.dumps(analysis["resonance_groups"])
+    json.dumps(analysis["oscillators"])
+    json.dumps(analysis["resonance_groups"])
     aggregate_json = json.dumps(analysis["aggregate_spectrum"])
     recs_html = "".join(f"<li>{html_mod.escape(r)}</li>" for r in analysis["recommendations"])
 

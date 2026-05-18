@@ -58,9 +58,8 @@ import json
 import math
 import random
 import statistics
-import sys
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -851,9 +850,9 @@ class NociceptionInsightGenerator:
         insights = []
         agent_states = report_data.get("agent_states", {})
         reflexes = report_data.get("reflexes", [])
-        memories = report_data.get("memories", [])
+        report_data.get("memories", [])
         timeline = report_data.get("timeline", [])
-        health = report_data.get("health")
+        report_data.get("health")
 
         # High pain load warning
         pain_levels = [s.current_pain_level for s in agent_states.values()]

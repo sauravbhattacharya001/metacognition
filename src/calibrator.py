@@ -19,11 +19,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import math
 import random
-import statistics
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 from src.agents.metacognitive import MockAgent

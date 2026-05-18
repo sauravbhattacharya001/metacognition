@@ -56,12 +56,10 @@ from __future__ import annotations
 import argparse
 import html as html_mod
 import json
-import math
 import random
 import statistics
-import sys
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -627,7 +625,7 @@ class SwarmProprioceptionEngine:
             return
 
         n = len(self._agents)
-        total_conns = self._total_connections()
+        self._total_connections()
         avg_degree = self._average_degree()
         diameter = self._compute_diameter()
 

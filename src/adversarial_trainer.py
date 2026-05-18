@@ -22,12 +22,10 @@ import argparse
 import asyncio
 import html as html_mod
 import json
-import math
 import random
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from src.agents.base import BaseAgent
 from src.core.protocol import MBFTEngine

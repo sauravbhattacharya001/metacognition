@@ -34,9 +34,9 @@ Design notes:
 from __future__ import annotations
 
 import json
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import datetime, timezone
-from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Callable, List, Mapping, Optional, Sequence, Tuple
 
 from pydantic import BaseModel, Field
 

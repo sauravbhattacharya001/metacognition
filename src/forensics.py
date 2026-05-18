@@ -15,21 +15,20 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import math
 import random
 import statistics
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 # Allow running as a module from the repo root
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine
-from src.core.state import RoundResult, Vote
+from src.core.state import RoundResult
 
 
 # ── Data structures ────────────────────────────────────────────────────

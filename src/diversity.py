@@ -25,9 +25,8 @@ import asyncio
 import html
 import json
 import math
-import sys
 from collections import Counter
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine
@@ -521,7 +520,7 @@ async def run_simulation(
     # Run multiple independent consensus sessions
     for _ in range(n_rounds):
         engine = MBFTEngine(agents, threshold=threshold, max_rounds=4)
-        result = await engine.run("Diversity analysis task")
+        await engine.run("Diversity analysis task")
         all_results.extend(engine.history)
 
     # Use last engine's reputation as representative

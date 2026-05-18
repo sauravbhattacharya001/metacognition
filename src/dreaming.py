@@ -57,15 +57,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import hashlib
 import html as html_mod
 import json
-import math
 import random
 import statistics
-import sys
 import time
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -654,7 +651,7 @@ class SwarmDreamEngine:
 
         # Cycle timeline data for chart
         cycle_labels = [f"Cycle {c.cycle_id}" for c in journal.cycles]
-        cycle_durations = [c.total_duration_ms for c in journal.cycles]
+        [c.total_duration_ms for c in journal.cycles]
         cycle_schemas = [len(c.schemas_produced) for c in journal.cycles]
         cycle_hypotheses = [len(c.hypotheses_produced) for c in journal.cycles]
 

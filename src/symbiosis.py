@@ -58,10 +58,9 @@ import json
 import math
 import random
 import statistics
-import sys
 import time
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -908,7 +907,7 @@ def main() -> None:
     print("=" * 50)
     print(f"Simulating {args.agents} agents with {args.interactions} interactions...\n")
 
-    engine = SymbiosisEngine()
+    SymbiosisEngine()
     # Run demo internally
     report = run_demo(num_agents=args.agents, num_interactions=args.interactions)
 

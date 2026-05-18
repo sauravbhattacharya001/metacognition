@@ -669,7 +669,7 @@ class LeaderRotationAdvisor:
             }
             return order.get(a.verdict, 4)
 
-        by_id = {a.agent_id: a for a in agents}
+        {a.agent_id: a for a in agents}
         queue: List[LeaderSlot] = []
         picked_history: List[str] = []  # ordered list of prior picks
         roster_size = len(agents)
@@ -775,12 +775,12 @@ class LeaderRotationAdvisor:
         eligible_count = sum(
             1 for a in agents if a.verdict in ("LEAD_NOW", "LEAD_SOON")
         )
-        viable_count = sum(
+        sum(
             1
             for a in agents
             if a.verdict in ("LEAD_NOW", "LEAD_SOON", "STANDBY")
         )
-        bench_or_skip = [
+        [
             a.agent_id for a in agents if a.verdict in ("BENCH", "SKIP")
         ]
 

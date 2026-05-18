@@ -57,10 +57,7 @@ import json
 import math
 import random
 import statistics
-import sys
-import time
-from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -408,7 +405,7 @@ class SwarmMicrobiomeEngine:
 
         metabolite_levels = {m.name: m.current_level for m in self._metabolites.values()}
         health = self._compute_health_score()
-        tier = self._classify_tier(health)
+        self._classify_tier(health)
 
         snapshot = MicrobiomeSnapshot(
             tick=self._tick,
@@ -493,7 +490,6 @@ class SwarmMicrobiomeEngine:
 
             # Diversity crash: Shannon < 0.5 when we have >2 species potential
             if ns.diversity_index < 0.5 and len(ns.populations) > 1:
-                prev_diversity = 0.0
                 if len(self._snapshots) >= 5:
                     prev_div = self._snapshots[-5].diversity_scores.get(ns.niche_name, 0.0)
                     if prev_div > 1.0 and ns.diversity_index < prev_div * 0.5:
