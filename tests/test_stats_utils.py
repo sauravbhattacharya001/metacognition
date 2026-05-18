@@ -69,6 +69,57 @@ class TestPearson:
         r2 = pearson([2 * v for v in x], [3 * v + 5 for v in y])
         assert r1 == pytest.approx(r2, abs=1e-9)
 
+    # ------------------------------------------------------------------
+    # Regression tests for the catastrophic-cancellation bug.
+    #
+    # Prior implementation used the naive ``n*Σxy - Σx*Σy`` identity which
+    # silently returned 0.0 (or the wrong sign) for series whose mean was
+    # large relative to their variance — exactly the shape produced by
+    # mBFT reputation / weight accumulators on long runs. The streaming
+    # Welford update should give the correct answer to ~5 decimal places
+    # even at 1e12 scale.
+    # ------------------------------------------------------------------
+    def test_large_mean_perfect_negative_correlation(self):
+        # Reflective pattern around a 1e12 mean. Old impl returned ~0.0;
+        # numerically-stable impl should return ~ -1.0.
+        xs = [1e12 + 1, 1e12 - 1, 1e12 + 2, 1e12 - 2, 1e12]
+        ys = [1e12 - 1, 1e12 + 1, 1e12 - 2, 1e12 + 2, 1e12]
+        r = pearson(xs, ys)
+        assert r == pytest.approx(-1.0, abs=1e-3)
+
+    def test_large_mean_perfect_positive_correlation(self):
+        # Strictly linear series at 1e9 offset.
+        xs = [1e9 + i for i in range(50)]
+        ys = [2e9 + 3 * i for i in range(50)]
+        r = pearson(xs, ys)
+        assert r == pytest.approx(1.0, abs=1e-9)
+
+    def test_large_offset_invariance_against_zero_mean_baseline(self):
+        # Adding a constant to both series must not change the correlation
+        # by more than floating-point can justify. This is the property the
+        # old naive ``n*Σxy − Σx*Σy`` formula violated catastrophically:
+        # at an offset of ~1e9 it flipped the sign / collapsed to 0.
+        # Tolerance grows with offset because float64 still loses precision
+        # near 1e12, just gracefully instead of catastrophically.
+        base_x = [0.1, -0.4, 0.7, -0.2, 0.5, -0.9, 0.3]
+        base_y = [-0.2, 0.3, 0.1, 0.8, -0.5, 0.4, -0.7]
+        r_centered = pearson(base_x, base_y)
+        for offset, tol in ((1e6, 1e-8), (1e9, 1e-6), (1e12, 1e-3)):
+            shifted_x = [v + offset for v in base_x]
+            shifted_y = [v + offset for v in base_y]
+            r_shifted = pearson(shifted_x, shifted_y)
+            assert r_shifted == pytest.approx(r_centered, abs=tol), (
+                f"offset {offset} changed pearson from {r_centered} to {r_shifted}"
+            )
+
+    def test_result_clamped_to_unit_interval(self):
+        # Float overshoot on perfectly-correlated series must not leak past
+        # ±1.0; downstream callers may feed the value into ``acos``.
+        xs = [1e15 + i for i in range(10)]
+        ys = [1e15 + 2 * i for i in range(10)]
+        r = pearson(xs, ys)
+        assert -1.0 <= r <= 1.0
+
 
 class TestGini:
     def test_perfect_equality(self):

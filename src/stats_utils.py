@@ -19,9 +19,22 @@ def pearson(x: Sequence[float], y: Sequence[float]) -> float:
     mismatched lengths — which mirrors the previous ``zip``-truncating
     behaviour by silently using the shorter length).
 
-    Implementation note: single pass using the running-sums identity
-    ``cov_xy * n = n*Σxy - Σx*Σy`` so the result is computed in O(n) time
-    and O(1) auxiliary space instead of the previous four passes.
+    Implementation note: numerically-stable streaming update due to Welford
+    (1962) / Bennett, Grout, Pébay et al. (2009) for the co-moment ``C2``.
+    The earlier implementation used the textbook
+    ``cov * n = n*Σxy − Σx*Σy`` identity, which suffers catastrophic
+    cancellation when the inputs have a large mean relative to their
+    variance: e.g. ``pearson([1e12-2, 1e12+1, ...], [1e12+2, 1e12-1, ...])``
+    silently returned ``0.0`` even though the series were perfectly
+    anti-correlated. Several mBFT hot paths (`deadlock`, `emergence`,
+    `influence`) feed it reputation/weight series with exactly that shape
+    — running sums easily reach ``1e6+`` while the per-tick deltas live in
+    ``[0, 1]`` — so the bad answer was silently corrupting downstream
+    diagnostics. The streaming update keeps everything in mean-centered
+    space and is the same algorithm NumPy uses internally for
+    ``np.cov(..., ddof=0)``.
+
+    Performs a single pass in O(n) time and O(1) auxiliary space.
     """
     n = len(x)
     if len(y) < n:
@@ -29,30 +42,44 @@ def pearson(x: Sequence[float], y: Sequence[float]) -> float:
     if n < 2:
         return 0.0
 
-    sum_x = 0.0
-    sum_y = 0.0
-    sum_xx = 0.0
-    sum_yy = 0.0
-    sum_xy = 0.0
-    for i in range(n):
-        xi = x[i]
-        yi = y[i]
-        sum_x += xi
-        sum_y += yi
-        sum_xx += xi * xi
-        sum_yy += yi * yi
-        sum_xy += xi * yi
+    # Welford-style online co-moments. We accumulate the running means
+    # (mean_x, mean_y) and the centered sums of squares / cross-products
+    # (m2_x, m2_y, c2_xy) with the update from Pébay (2008):
+    #     dx = x_k - mean_x_old
+    #     mean_x_new = mean_x_old + dx / k
+    #     m2_x += dx * (x_k - mean_x_new)
+    #     c2_xy += (k-1)/k * dx_old * dy_old
+    mean_x = 0.0
+    mean_y = 0.0
+    m2_x = 0.0
+    m2_y = 0.0
+    c2_xy = 0.0
+    for k in range(1, n + 1):
+        xi = x[k - 1]
+        yi = y[k - 1]
+        dx = xi - mean_x
+        dy = yi - mean_y
+        # The cross-moment update uses the *old* means / weight (k-1)/k.
+        c2_xy += dx * dy * (k - 1) / k
+        mean_x += dx / k
+        mean_y += dy / k
+        # m2 updates use the *new* mean for the second factor.
+        m2_x += dx * (xi - mean_x)
+        m2_y += dy * (yi - mean_y)
 
-    # Variance numerators (n * variance):
-    var_x_num = n * sum_xx - sum_x * sum_x
-    var_y_num = n * sum_yy - sum_y * sum_y
     # Floating-point can drive a true zero-variance series very slightly
     # negative; treat anything non-positive as degenerate.
-    if var_x_num <= 0.0 or var_y_num <= 0.0:
+    if m2_x <= 0.0 or m2_y <= 0.0:
         return 0.0
 
-    cov_num = n * sum_xy - sum_x * sum_y
-    return cov_num / math.sqrt(var_x_num * var_y_num)
+    r = c2_xy / math.sqrt(m2_x * m2_y)
+    # Clamp into [-1, 1] to absorb floating-point overshoot on near-perfect
+    # correlations; otherwise downstream code that does ``acos(r)`` blows up.
+    if r > 1.0:
+        return 1.0
+    if r < -1.0:
+        return -1.0
+    return r
 
 
 def gini(values: Iterable[float]) -> float:
