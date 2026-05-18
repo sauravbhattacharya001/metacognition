@@ -41,4 +41,5 @@ nav:
   - Engine Catalog: engines.md
   - Tuning & Operations: tuning.md
   - Testing & Simulation: testing.md
+  - Agent Calibration: calibration.md
   - API Reference: api.md
