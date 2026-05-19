@@ -83,6 +83,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from .stats_utils import clamp01
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -1360,8 +1362,8 @@ def _simulate(
         # Clamp
         latency = max(0.1, latency)
         throughput = max(0.0, throughput)
-        failure_rate = max(0.0, min(1.0, failure_rate))
-        utilization = max(0.0, min(1.0, utilization))
+        failure_rate = clamp01(failure_rate)
+        utilization = clamp01(utilization)
         entropy = max(0.0, entropy)
         margin = max(-0.5, margin)
 

@@ -61,6 +61,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .stats_utils import clamp01
+
 
 # ---------------------------------------------------------------------------
 # Enums & Data Models
@@ -320,11 +322,11 @@ class SwarmHibernationEngine:
 
     def set_resource_level(self, level: float) -> None:
         """Set current resource level (0-1)."""
-        self._resource_level = max(0.0, min(1.0, level))
+        self._resource_level = clamp01(level)
 
     def inject_threat(self, severity: float = 0.8) -> None:
         """Inject an emergency threat signal."""
-        self._threat_level = max(0.0, min(1.0, severity))
+        self._threat_level = clamp01(severity)
 
     # ------------------------------------------------------------------
     # Engine 1: Energy Budget Tracker

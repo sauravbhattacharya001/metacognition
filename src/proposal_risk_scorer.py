@@ -276,8 +276,14 @@ def _jaccard(a: Iterable[str], b: Iterable[str]) -> float:
     return inter / union if union else 0.0
 
 
+from .stats_utils import clamp as _clamp_base
+
+
 def _clamp(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
-    return max(lo, min(hi, x))
+    """Thin alias for :func:`stats_utils.clamp` with the 0..100 severity
+    defaults this module uses for every risk-score saturation.
+    """
+    return _clamp_base(x, lo, hi)
 
 
 class ProposalRiskScorer:

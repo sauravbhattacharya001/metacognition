@@ -74,6 +74,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from .stats_utils import clamp01
+
 
 # ── Enums ────────────────────────────────────────────────────────────────
 
@@ -161,7 +163,7 @@ class Epigenome:
             elif mark.mark_type == MarkType.UBIQUITINATION:
                 expr -= mark.strength * 0.8
 
-        return max(0.0, min(1.0, expr))
+        return clamp01(expr)
 
     def compute_fitness(self) -> float:
         """Compute overall fitness from expression profile."""
@@ -175,7 +177,7 @@ class Epigenome:
             if gene.essential and expr < 0.2:
                 penalty += (0.2 - expr) * 2.0
         avg_expr = total / len(self.genes)
-        return max(0.0, min(1.0, avg_expr - penalty))
+        return clamp01(avg_expr - penalty)
 
     def decay_marks(self) -> List[EpigeneticMark]:
         """Decay marks by one tick, remove expired ones. Returns removed marks."""
@@ -344,7 +346,7 @@ class EpigeneticsEngine:
         mark_effect: Optional[MarkType] = None,
     ) -> EnvironmentalSignal:
         """Emit an environmental signal that affects agent epigenomes."""
-        intensity = max(0.0, min(1.0, intensity))
+        intensity = clamp01(intensity)
         if target_genes is None:
             target_genes = SIGNAL_DEFAULT_TARGETS.get(signal_type, ["adaptability"])
         if mark_effect is None:

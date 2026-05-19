@@ -61,6 +61,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
+from .stats_utils import clamp01
+
 from src.stats_utils import gini as _gini_shared
 
 
@@ -223,8 +225,8 @@ class SocialLearningEngine:
         self.num_initial_skills = max(1, num_initial_skills)
         self.observation_range = max(1, observation_range)
         self.teaching_cost = max(0.0, teaching_cost)
-        self.innovation_rate = max(0.0, min(1.0, innovation_rate))
-        self.mutation_rate = max(0.0, min(1.0, mutation_rate))
+        self.innovation_rate = clamp01(innovation_rate)
+        self.mutation_rate = clamp01(mutation_rate)
         self.rng = random.Random(seed)
 
         self.current_tick: int = 0

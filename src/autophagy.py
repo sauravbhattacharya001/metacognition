@@ -72,6 +72,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from .stats_utils import clamp01
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -179,7 +181,7 @@ class AutophagyEngine:
         self.mode = mode
         self.cooldown_rounds = cooldown_rounds
         self.cooldown_remaining = 0
-        self.stress_level = max(0.0, min(1.0, stress_level))
+        self.stress_level = clamp01(stress_level)
         self.current_round = 0
 
         # History per agent: list of AgentRoundData per round
@@ -243,7 +245,7 @@ class AutophagyEngine:
         if subsystem_health:
             for name, health in subsystem_health.items():
                 self.subsystems[name] = SubsystemHealth(
-                    name=name, health=max(0.0, min(1.0, health)), last_updated=round_num
+                    name=name, health=clamp01(health), last_updated=round_num
                 )
 
         # Track interactions for circular dependency detection
@@ -260,7 +262,7 @@ class AutophagyEngine:
 
     def set_stress(self, level: float) -> None:
         """Update stress level (0-1)."""
-        self.stress_level = max(0.0, min(1.0, level))
+        self.stress_level = clamp01(level)
 
     def detect(self) -> List[Dysfunction]:
         """Run all 7 dysfunction detectors. Returns newly detected dysfunctions.

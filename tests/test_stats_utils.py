@@ -5,7 +5,7 @@ import math
 
 import pytest
 
-from src.stats_utils import cosine_similarity, gini, pearson
+from src.stats_utils import clamp, clamp01, cosine_similarity, gini, pearson
 
 
 class TestPearson:
@@ -224,3 +224,52 @@ class TestCosineSimilarity:
             b = [rng.uniform(-10, 10) for _ in range(n)]
             sim = cosine_similarity(a, b)
             assert -1.0 - 1e-9 <= sim <= 1.0 + 1e-9
+
+
+class TestClamp:
+    def test_within_bounds_returns_value(self):
+        assert clamp(0.5, 0.0, 1.0) == 0.5
+
+    def test_below_lo_returns_lo(self):
+        assert clamp(-3.0, 0.0, 1.0) == 0.0
+
+    def test_above_hi_returns_hi(self):
+        assert clamp(7.0, 0.0, 1.0) == 1.0
+
+    def test_inclusive_bounds(self):
+        assert clamp(0.0, 0.0, 1.0) == 0.0
+        assert clamp(1.0, 0.0, 1.0) == 1.0
+
+    def test_arbitrary_range(self):
+        assert clamp(150.0, -10.0, 100.0) == 100.0
+        assert clamp(-50.0, -10.0, 100.0) == -10.0
+        assert clamp(42.0, -10.0, 100.0) == 42.0
+
+    def test_degenerate_range_collapses(self):
+        # lo == hi forces the result regardless of value.
+        assert clamp(99.0, 5.0, 5.0) == 5.0
+        assert clamp(-99.0, 5.0, 5.0) == 5.0
+
+
+class TestClamp01:
+    def test_within_unit_interval(self):
+        for v in (0.0, 0.1, 0.5, 0.9, 1.0):
+            assert clamp01(v) == v
+
+    def test_below_zero_saturates(self):
+        assert clamp01(-0.0001) == 0.0
+        assert clamp01(-1e9) == 0.0
+
+    def test_above_one_saturates(self):
+        assert clamp01(1.0001) == 1.0
+        assert clamp01(1e9) == 1.0
+
+    def test_matches_inlined_form(self):
+        # The whole point of the helper is to be behaviour-identical to
+        # the ``max(0.0, min(1.0, x))`` it replaces across ~25 call sites.
+        import random
+
+        rng = random.Random(20260519)
+        for _ in range(500):
+            x = rng.uniform(-5.0, 5.0)
+            assert clamp01(x) == max(0.0, min(1.0, x))

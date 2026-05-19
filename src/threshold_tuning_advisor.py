@@ -211,8 +211,7 @@ class ThresholdTuningReport(BaseModel):
 _RISK_APPETITES = ("cautious", "balanced", "aggressive")
 
 
-def _clamp(value: float, lo: float, hi: float) -> float:
-    return max(lo, min(hi, value))
+from .stats_utils import clamp as _clamp
 
 
 def _priority_for(severity: int) -> str:

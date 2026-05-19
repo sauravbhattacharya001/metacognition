@@ -12,6 +12,43 @@ import math
 from typing import Iterable, Sequence
 
 
+def clamp(value: float, lo: float, hi: float) -> float:
+    """Clamp ``value`` into the closed interval ``[lo, hi]``.
+
+    This is the single shared implementation used across the codebase. The
+    previous state was 26 inlined ``max(lo, min(hi, x))`` call sites plus
+    two private ``_clamp`` helpers in ``proposal_risk_scorer`` and
+    ``threshold_tuning_advisor``; consolidating them here means:
+
+    * one obvious place to add NaN / inf hardening if we ever need it;
+    * the hot ``[0, 1]`` saturation path gets its own dedicated
+      :func:`clamp01` that skips an extra argument-binding frame;
+    * unit tests cover the contract once instead of being scattered
+      across module-specific test files.
+
+    No semantic change vs the inlined ``max(lo, min(hi, value))`` form.
+    Callers that previously relied on Python's ``min``/``max`` NaN
+    behaviour (return the first argument) keep that behaviour because we
+    delegate to the same builtins.
+    """
+    return max(lo, min(hi, value))
+
+
+def clamp01(value: float) -> float:
+    """Saturate ``value`` into the unit interval ``[0.0, 1.0]``.
+
+    Dedicated alias for the most common clamp in this codebase: every
+    swarm engine that exposes a 0..1 probability / intensity / health
+    parameter validates it with ``max(0.0, min(1.0, x))``. Naming it
+    explicitly makes the intent visible at the call site
+    (``clamp01(stress)`` reads as "stress in [0,1]") and gives us a
+    single hook if we ever need to harden the contract (e.g. reject
+    NaN). Delegates to the same ``max``/``min`` builtins as before, so
+    it is behaviour-identical to the inlined form it replaces.
+    """
+    return max(0.0, min(1.0, value))
+
+
 def pearson(x: Sequence[float], y: Sequence[float]) -> float:
     """Pearson correlation coefficient between two equal-length series.
 

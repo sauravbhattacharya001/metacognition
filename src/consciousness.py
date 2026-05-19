@@ -73,6 +73,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
+from .stats_utils import clamp01
+
 
 # ---------------------------------------------------------------------------
 # Data Models
@@ -203,7 +205,7 @@ class SwarmConsciousnessEngine:
     def submit_belief(self, agent_id: str, topic: str, value: float, confidence: float = 1.0) -> None:
         """Agent declares a belief about a topic (-1.0 to 1.0)."""
         value = max(-1.0, min(1.0, value))
-        confidence = max(0.0, min(1.0, confidence))
+        confidence = clamp01(confidence)
         belief = AgentBelief(
             agent_id=agent_id,
             topic=topic,
@@ -217,7 +219,7 @@ class SwarmConsciousnessEngine:
 
     def submit_attention(self, agent_id: str, topic: str, intensity: float = 1.0) -> None:
         """Agent reports what it's currently focused on."""
-        intensity = max(0.0, min(1.0, intensity))
+        intensity = clamp01(intensity)
         event = AttentionEvent(
             agent_id=agent_id,
             focus_topic=topic,
@@ -352,7 +354,7 @@ class SwarmConsciousnessEngine:
 
         # Coherence = 1 - normalized_entropy
         coherence = 1.0 - (entropy / max_entropy)
-        return max(0.0, min(1.0, coherence))
+        return clamp01(coherence)
 
     def compute_intentional_coherence(self) -> float:
         """Are agents pursuing the same goals? High = shared purpose."""
