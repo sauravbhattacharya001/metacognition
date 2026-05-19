@@ -284,7 +284,7 @@ class TestGrudgeEngineFullRun:
             n_agents=3, n_rounds=2, n_scenarios=3,
             threshold=1.5, seed=42,
         )
-        results = asyncio.get_event_loop().run_until_complete(eng.run())
+        results = asyncio.run(eng.run())
 
         # Structure checks
         assert "matrix" in results
@@ -317,7 +317,7 @@ class TestGrudgeEngineFullRun:
         eng = GrudgeEngine(
             n_agents=3, n_rounds=2, n_scenarios=5, seed=7,
         )
-        results = asyncio.get_event_loop().run_until_complete(eng.run())
+        results = asyncio.run(eng.run())
         assert len(results["timeline"]) == 5
         for i, snap in enumerate(results["timeline"]):
             assert snap["scenario"] == i
@@ -326,7 +326,7 @@ class TestGrudgeEngineFullRun:
         """Same seed should produce same results."""
         def do_run():
             eng = GrudgeEngine(n_agents=4, n_rounds=2, n_scenarios=5, seed=123)
-            return asyncio.get_event_loop().run_until_complete(eng.run())
+            return asyncio.run(eng.run())
 
         r1 = do_run()
         r2 = do_run()
@@ -343,8 +343,8 @@ class TestGrudgeEngineFullRun:
             n_agents=4, n_rounds=3, n_scenarios=10,
             forgiveness_rate=0.5, seed=55,
         )
-        r_low = asyncio.get_event_loop().run_until_complete(eng_low.run())
-        r_high = asyncio.get_event_loop().run_until_complete(eng_high.run())
+        r_low = asyncio.run(eng_low.run())
+        r_high = asyncio.run(eng_high.run())
         # Higher forgiveness → higher stability (fewer grudges)
         assert r_high["stability"] >= r_low["stability"]
 
@@ -353,7 +353,7 @@ class TestGrudgeEngineFullRun:
             n_agents=5, n_rounds=3, n_scenarios=2,
             threshold=2.5, grudge_threshold=0.6, forgiveness_rate=0.08, seed=1,
         )
-        results = asyncio.get_event_loop().run_until_complete(eng.run())
+        results = asyncio.run(eng.run())
         cfg = results["config"]
         assert cfg["n_agents"] == 5
         assert cfg["n_scenarios"] == 2
@@ -396,7 +396,7 @@ class TestHtmlReport:
         eng = GrudgeEngine(
             n_agents=3, n_rounds=2, n_scenarios=3, seed=42,
         )
-        results = asyncio.get_event_loop().run_until_complete(eng.run())
+        results = asyncio.run(eng.run())
         html = generate_html_report(results)
 
         assert "<!DOCTYPE html>" in html
@@ -409,7 +409,7 @@ class TestHtmlReport:
         eng = GrudgeEngine(
             n_agents=4, n_rounds=2, n_scenarios=2, seed=99,
         )
-        results = asyncio.get_event_loop().run_until_complete(eng.run())
+        results = asyncio.run(eng.run())
         html = generate_html_report(results)
         for i in range(4):
             assert f"agent_{i}" in html
@@ -418,7 +418,7 @@ class TestHtmlReport:
         eng = GrudgeEngine(
             n_agents=3, n_rounds=2, n_scenarios=2, seed=10,
         )
-        results = asyncio.get_event_loop().run_until_complete(eng.run())
+        results = asyncio.run(eng.run())
         html = generate_html_report(results)
         assert str(results["stability"]) in html
 
@@ -429,12 +429,12 @@ class TestHtmlReport:
 class TestEdgeCases:
     def test_single_scenario(self):
         eng = GrudgeEngine(n_agents=2, n_rounds=1, n_scenarios=1, seed=42)
-        results = asyncio.get_event_loop().run_until_complete(eng.run())
+        results = asyncio.run(eng.run())
         assert results["total_interactions"] > 0
         assert len(results["timeline"]) == 1
 
     def test_many_agents(self):
         eng = GrudgeEngine(n_agents=10, n_rounds=2, n_scenarios=2, seed=7)
-        results = asyncio.get_event_loop().run_until_complete(eng.run())
+        results = asyncio.run(eng.run())
         assert len(results["profiles"]) == 10
         assert len(results["matrix"]) == 10

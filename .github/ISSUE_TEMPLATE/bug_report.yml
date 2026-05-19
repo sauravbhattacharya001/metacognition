@@ -1,0 +1,85 @@
+name: 🐛 Bug report
+description: Report a defect in mBFT (incorrect behaviour, crash, hung consensus round, etc.)
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill in as much as you can —
+        reproducible cases get fixed first. If this is a *security* issue, please use
+        [security advisories](https://github.com/sauravbhattacharya001/metacognition/security/advisories/new)
+        instead of a public bug report.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One- or two-sentence description of the problem.
+      placeholder: "Consensus engine returns COMMIT with f+1 votes when quorum should require 2f+1."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: |
+        Code, config, or step-by-step actions that reliably trigger the bug.
+        Smaller is better. Inline Python with a fixed seed beats a description.
+      render: python
+      placeholder: |
+        import asyncio
+        from src.consensus import Engine
+        eng = Engine(n_agents=4, f=1, seed=42)
+        result = asyncio.run(eng.propose(...))
+        assert result.committed  # actually returns False
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include full tracebacks, log lines, or returned data structures.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: mBFT version / commit
+      description: "Output of `pip show mbft-consensus` or the commit SHA you're on."
+      placeholder: "0.1.0 (commit abc1234)"
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.12.2"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Windows 11 24H2 / Ubuntu 24.04 / macOS 14.5"
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context
+      description: Anything else that might help — related modules, scale of the swarm, async runtime, etc.

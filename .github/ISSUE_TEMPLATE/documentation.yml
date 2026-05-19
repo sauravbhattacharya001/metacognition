@@ -1,0 +1,27 @@
+name: 📚 Documentation issue
+description: Report missing, wrong, or confusing documentation.
+title: "[docs] "
+labels: ["documentation", "triage"]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Where is the doc?
+      description: URL, file path, or section heading.
+      placeholder: "docs/protocol.md § 3.2 'Vote weighting'"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing?
+      description: Quote the existing text if it's incorrect; describe what's missing if it's a gap.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested
+    attributes:
+      label: Suggested wording (optional)
+      description: A draft replacement or addition. PRs welcome.

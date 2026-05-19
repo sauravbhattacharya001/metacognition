@@ -1,0 +1,60 @@
+name: ✨ Feature request
+description: Propose a new capability, protocol extension, or analysis module.
+title: "[feature] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        mBFT favours additions that strengthen the **metacognition-through-disagreement**
+        thesis: things that make agents debate better, weight votes more honestly, or
+        expose the swarm's epistemic state. Please frame the proposal in those terms.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What is missing or awkward today? Who feels the pain?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: |
+        Sketch the API, protocol change, or module. Pseudocode is welcome.
+        If this touches the consensus path, call out the invariants it must preserve
+        (safety under f Byzantine agents, liveness under partial synchrony, etc.).
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other designs you weighed and why you rejected them.
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Core consensus (`src/core/*`)
+        - Agent module (`src/agents/*`)
+        - Networking (`src/network/*`)
+        - Analysis / diagnostics (e.g. forensics, calibrator)
+        - Tooling / DX (CI, docs, packaging)
+        - Other (specify in proposal)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched existing issues and didn't find a duplicate.
+          required: true
+        - label: I'm willing to discuss design trade-offs, not just request a feature.
+          required: true

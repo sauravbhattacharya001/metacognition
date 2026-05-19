@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Security vulnerability
+    url: https://github.com/sauravbhattacharya001/metacognition/security/advisories/new
+    about: Report security issues privately via GitHub Security Advisories — please do NOT file a public issue.
+  - name: 💬 Questions & discussion
+    url: https://github.com/sauravbhattacharya001/metacognition/discussions
+    about: For open-ended questions, design discussions, or protocol theory. Use Discussions instead of Issues.
