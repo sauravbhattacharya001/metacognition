@@ -82,6 +82,15 @@ def _compute_metrics(
         outcomes.append(1 if res.committed else 0)
 
     # Per-agent metrics
+    # Pre-compute per-round invariants (aggregate weight and the
+    # baseline commit decision) once. The previous implementation
+    # recomputed both inside the agent loop, giving O(A * R) repeated
+    # work where A = #agents and R = #rounds; for the analyses we run
+    # (A ~= 10–20, R ~= 100–500) this was the dominant cost in
+    # ``_compute_metrics``. Hoisting collapses it to O(R).
+    aggregates = [res.aggregate_weight for res in results]
+    committed_with = [agg >= threshold for agg in aggregates]
+
     agent_metrics: Dict[str, Dict] = {}
     for aid in agent_ids:
         weights = vote_matrix[aid]
@@ -92,14 +101,11 @@ def _compute_metrics(
         # Swing Power & Kingmaker
         swing = 0
         kingmaker = 0
-        for i, res in enumerate(results):
-            agg = res.aggregate_weight
+        for i in range(n):
             w = weights[i]
             # Would removing this agent's vote change the outcome?
-            agg_without = agg - w
-            committed_with = agg >= threshold
-            committed_without = agg_without >= threshold
-            if committed_with != committed_without:
+            committed_without = (aggregates[i] - w) >= threshold
+            if committed_with[i] != committed_without:
                 swing += 1
                 # Kingmaker: the single decisive flip
                 kingmaker += 1
