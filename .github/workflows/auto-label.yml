@@ -1,0 +1,31 @@
+name: PR Auto-Label
+
+# Auto-applies labels to pull requests based on file paths defined in
+# .github/labeler.yml. Uses pull_request_target so PRs from forks still
+# get labelled (the action only needs read access to the PR diff, plus
+# write access to PR labels — no checkout of fork code).
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: auto-label-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: Apply path-based labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply labels from .github/labeler.yml
+        uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/labeler.yml
+          sync-labels: true
+          dot: true

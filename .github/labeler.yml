@@ -1,0 +1,90 @@
+# Auto-label PRs based on file paths.
+# Consumed by .github/workflows/auto-label.yml (actions/labeler@v5).
+# Each top-level key is a label name; the changed-files block lists glob
+# patterns. A PR receives the label when ANY file matches.
+
+agents:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/agents/**'
+          - 'tests/test_*agent*.py'
+
+core:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/core/**'
+          - 'src/__init__.py'
+
+network:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/network/**'
+
+stats-utils:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/stats_utils.py'
+          - 'tests/test_stats_utils.py'
+
+# Coarse "engines" bucket: everything in src/ that isn't agents/core/network.
+# Useful because most of the codebase is the 60+ swarm engine modules.
+engines:
+  - changed-files:
+      - all-globs-to-any-file:
+          - 'src/**/*.py'
+          - '!src/agents/**'
+          - '!src/core/**'
+          - '!src/network/**'
+          - '!src/stats_utils.py'
+          - '!src/__init__.py'
+          - '!src/py.typed'
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'tests/**'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - 'paper/**'
+          - 'mkdocs.yml'
+          - '**/*.md'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/**'
+          - '.github/dependabot.yml'
+          - '.github/labeler.yml'
+          - '.codecov.yml'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pyproject.toml'
+          - 'requirements*.txt'
+          - '.github/dependabot.yml'
+
+docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Dockerfile'
+          - '.dockerignore'
+          - '.github/workflows/docker.yml'
+
+packaging:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pyproject.toml'
+          - 'PUBLISHING.md'
+          - '.github/workflows/publish.yml'
+
+github-config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/ISSUE_TEMPLATE/**'
+          - '.github/PULL_REQUEST_TEMPLATE.md'
+          - '.github/copilot-instructions.md'
+          - '.github/copilot-setup-steps.yml'
