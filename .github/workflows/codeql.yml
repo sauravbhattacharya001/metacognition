@@ -2,9 +2,21 @@ name: CodeQL
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'paper/**'
+      - 'mkdocs.yml'
+      - 'LICENSE'
   pull_request:
-    branches: [main]
+    branches: [main, master]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'paper/**'
+      - 'mkdocs.yml'
+      - 'LICENSE'
   schedule:
     # Run weekly on Monday at 09:17 UTC
     - cron: '17 9 * * 1'
