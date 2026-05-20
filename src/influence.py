@@ -62,6 +62,46 @@ async def _run_simulation(
 
 # ── metrics ──────────────────────────────────────────────────────────────
 
+def _swing_stats(
+    weights: List[float],
+    aggregates: List[float],
+    committed_with: List[bool],
+    threshold: float,
+) -> Tuple[int, int]:
+    """Per-agent swing and kingmaker counts over a sequence of rounds.
+
+    Definitions (these are *distinct* — the previous in-line version
+    incremented both counters under the same condition, which made
+    ``kingmaker_score`` indistinguishable from ``swing_power`` for every
+    agent in every report; see commit message for the fix rationale):
+
+    * **swing** — the agent's vote flipped the outcome either way. That
+      is, removing their weight changes the commit decision (a commit
+      becomes a no-commit, or a no-commit becomes a commit).
+    * **kingmaker** — the *strictly decisive* commit case: the round
+      committed, and without this agent's *positive* contribution it
+      would not have. Negative votes (Byzantine dissent, contrarians)
+      can move a round across the threshold in either direction and
+      still register as a swing, but they are never "kingmakers" for
+      the commit they voted against — so we require ``weight > 0``.
+
+    Pulled out of ``_compute_metrics`` so the contract is unit-testable
+    in isolation; the function is pure and allocates nothing.
+    """
+    swing = 0
+    kingmaker = 0
+    for w, agg, cw in zip(weights, aggregates, committed_with):
+        cw_without = (agg - w) >= threshold
+        if cw != cw_without:
+            swing += 1
+            # Kingmaker = decisive *for* a commit (positive contribution
+            # that pushed the round over the line). Negative-weight
+            # swings are still swings but don't count as kingmaking.
+            if cw and w > 0:
+                kingmaker += 1
+    return swing, kingmaker
+
+
 def _compute_metrics(
     agent_ids: List[str],
     results: List[RoundResult],
@@ -105,20 +145,13 @@ def _compute_metrics(
         # Influence Radius: correlation with outcome
         influence_radius = _pearson(weights, outcomes_f)
 
-        # Swing Power & Kingmaker - iterate the three per-round series
-        # together via ``zip`` rather than ``range(n)`` + three bounds-
-        # checked ``__getitem__`` calls per round. The C-level zip iterator
-        # hands us the next triple without per-element list lookups; for
-        # the (A * R) total iterations this trims a measurable slice off
-        # ``_compute_metrics`` (see PERF note in commit message).
-        swing = 0
-        kingmaker = 0
-        for w, agg, cw in zip(weights, aggregates, committed_with):
-            # Would removing this agent's vote change the outcome?
-            if cw != ((agg - w) >= threshold):
-                swing += 1
-                # Kingmaker: the single decisive flip
-                kingmaker += 1
+        # Swing Power & Kingmaker — see ``_swing_stats`` for the
+        # contract. Previously these two counters were incremented
+        # under the *same* condition, which silently aliased
+        # kingmaker_score to swing_power in every generated report.
+        swing, kingmaker = _swing_stats(
+            weights, aggregates, committed_with, threshold
+        )
 
         agent_metrics[aid] = {
             "swing_power": swing / n if n else 0,
