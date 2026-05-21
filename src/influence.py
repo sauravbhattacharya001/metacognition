@@ -102,6 +102,86 @@ def _swing_stats(
     return swing, kingmaker
 
 
+def _build_vote_matrix(
+    agent_ids: List[str], results: List[RoundResult]
+) -> Tuple[Dict[str, List[float]], List[int]]:
+    """One pass over *results* builds (a) the per-agent vote weight series
+    and (b) the per-round commit outcome (1/0).
+
+    Extracted from ``_compute_metrics`` so the matrix construction can be
+    unit-tested and reused without re-walking the agent loop.
+    """
+    vote_matrix: Dict[str, List[float]] = {aid: [] for aid in agent_ids}
+    outcomes: List[int] = []
+    for res in results:
+        vote_map = {v.voter_id: v.weight for v in res.votes}
+        for aid in agent_ids:
+            vote_matrix[aid].append(vote_map.get(aid, 0.0))
+        outcomes.append(1 if res.committed else 0)
+    return vote_matrix, outcomes
+
+
+def _agent_metrics(
+    agent_ids: List[str],
+    vote_matrix: Dict[str, List[float]],
+    aggregates: List[float],
+    committed_with: List[bool],
+    outcomes_f: List[float],
+    threshold: float,
+    n: int,
+) -> Dict[str, Dict]:
+    """Compute per-agent influence metrics. Pure / side-effect free."""
+    out: Dict[str, Dict] = {}
+    for aid in agent_ids:
+        weights = vote_matrix[aid]
+        influence_radius = _pearson(weights, outcomes_f)
+        swing, kingmaker = _swing_stats(
+            weights, aggregates, committed_with, threshold
+        )
+        out[aid] = {
+            "swing_power": swing / n if n else 0,
+            "kingmaker_score": kingmaker / n if n else 0,
+            "influence_radius": round(influence_radius, 4),
+            "avg_weight": round(sum(weights) / len(weights), 4) if weights else 0,
+        }
+    return out
+
+
+def _detect_coalitions(
+    agent_ids: List[str],
+    vote_matrix: Dict[str, List[float]],
+    corr_threshold: float = 0.6,
+) -> List[Dict]:
+    """Return all (i<j) agent pairs whose vote-weight correlation
+    exceeds ``corr_threshold`` in absolute value. O(A^2 * R).
+    """
+    ids_list = list(agent_ids)
+    n_ids = len(ids_list)
+    coalitions: List[Dict] = []
+    for i in range(n_ids):
+        vi = vote_matrix[ids_list[i]]
+        for j in range(i + 1, n_ids):
+            corr = _pearson(vi, vote_matrix[ids_list[j]])
+            if abs(corr) > corr_threshold:
+                coalitions.append({
+                    "agents": [ids_list[i], ids_list[j]],
+                    "correlation": round(corr, 4),
+                })
+    return coalitions
+
+
+def _build_timeline(results: List[RoundResult]) -> List[Dict]:
+    return [
+        {
+            "round": i,
+            "committed": res.committed,
+            "aggregate": round(res.aggregate_weight, 4),
+            "leader": res.leader_id,
+        }
+        for i, res in enumerate(results)
+    ]
+
+
 def _compute_metrics(
     agent_ids: List[str],
     results: List[RoundResult],
@@ -111,88 +191,26 @@ def _compute_metrics(
     if n == 0:
         return {"agents": {}, "gini": 0.0, "coalitions": [], "timeline": []}
 
-    # Build vote matrix: agent → list of weights per round
-    vote_matrix: Dict[str, List[float]] = {aid: [] for aid in agent_ids}
-    outcomes: List[int] = []  # 1=committed, 0=not
+    vote_matrix, outcomes = _build_vote_matrix(agent_ids, results)
 
-    for res in results:
-        vote_map = {v.voter_id: v.weight for v in res.votes}
-        for aid in agent_ids:
-            vote_matrix[aid].append(vote_map.get(aid, 0.0))
-        outcomes.append(1 if res.committed else 0)
-
-    # Per-agent metrics
-    # Pre-compute per-round invariants (aggregate weight and the
-    # baseline commit decision) once. The previous implementation
-    # recomputed both inside the agent loop, giving O(A * R) repeated
-    # work where A = #agents and R = #rounds; for the analyses we run
-    # (A ~= 10–20, R ~= 100–500) this was the dominant cost in
-    # ``_compute_metrics``. Hoisting collapses it to O(R).
+    # Per-round invariants — hoisted out so the agent loop is O(A*R), not
+    # O(A*R) with R extra work per iteration. See git history for the
+    # profile that motivated this hoist.
     aggregates = [res.aggregate_weight for res in results]
     committed_with = [agg >= threshold for agg in aggregates]
-    # Hoist the outcome-as-float series out of the agent loop. The previous
-    # implementation rebuilt this list on every agent iteration
-    # (O(A * R) allocations + float coercions); building it once collapses
-    # that to O(R). At our typical sizes (A ~= 10-20, R ~= 100-500) the
-    # per-call save is small but the loop runs A times per analysis tick
-    # and the GC pressure from the throwaway lists shows up in profiles.
     outcomes_f: List[float] = [float(o) for o in outcomes]
 
-    agent_metrics: Dict[str, Dict] = {}
-    for aid in agent_ids:
-        weights = vote_matrix[aid]
+    agent_metrics = _agent_metrics(
+        agent_ids, vote_matrix, aggregates, committed_with,
+        outcomes_f, threshold, n,
+    )
 
-        # Influence Radius: correlation with outcome
-        influence_radius = _pearson(weights, outcomes_f)
-
-        # Swing Power & Kingmaker — see ``_swing_stats`` for the
-        # contract. Previously these two counters were incremented
-        # under the *same* condition, which silently aliased
-        # kingmaker_score to swing_power in every generated report.
-        swing, kingmaker = _swing_stats(
-            weights, aggregates, committed_with, threshold
-        )
-
-        agent_metrics[aid] = {
-            "swing_power": swing / n if n else 0,
-            "kingmaker_score": kingmaker / n if n else 0,
-            "influence_radius": round(influence_radius, 4),
-            "avg_weight": round(sum(weights) / len(weights), 4) if weights else 0,
-        }
-
-    # Power Asymmetry (Gini)
+    # Power Asymmetry (Gini of swing power across agents).
     swing_values = [m["swing_power"] for m in agent_metrics.values()]
     gini = round(_gini(swing_values), 4)
 
-    # Coalition Detection (Pearson > 0.6).
-    # Iterate the agent-id list once and hoist each outer vector out of
-    # the inner loop; the previous version did two dict + index lookups
-    # (``vote_matrix[ids_list[i]]`` / ``[ids_list[j]]``) on every pair,
-    # i.e. O(A^2) lookups instead of the O(A) we actually need. For A in
-    # the 10-50 range this halves the pairwise overhead before the
-    # ``_pearson`` call dominates.
-    coalitions = []
-    ids_list = list(agent_ids)
-    n_ids = len(ids_list)
-    for i in range(n_ids):
-        vi = vote_matrix[ids_list[i]]
-        for j in range(i + 1, n_ids):
-            corr = _pearson(vi, vote_matrix[ids_list[j]])
-            if abs(corr) > 0.6:
-                coalitions.append({
-                    "agents": [ids_list[i], ids_list[j]],
-                    "correlation": round(corr, 4),
-                })
-
-    # Timeline
-    timeline = []
-    for i, res in enumerate(results):
-        timeline.append({
-            "round": i,
-            "committed": res.committed,
-            "aggregate": round(res.aggregate_weight, 4),
-            "leader": res.leader_id,
-        })
+    coalitions = _detect_coalitions(agent_ids, vote_matrix)
+    timeline = _build_timeline(results)
 
     return {
         "agents": agent_metrics,
