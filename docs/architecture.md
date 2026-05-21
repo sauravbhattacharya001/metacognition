@@ -79,7 +79,23 @@ metacognition/
 │   ├── decomposer.py               # Task decomposition strategies
 │   ├── replay.py                    # Deterministic round replay
 │   ├── monitor.py                   # Consensus resilience stress-testing
-│   └── stats_utils.py              # Shared statistical helpers
+│   │
+│   │ ── Agentic Advisors (read-only recommenders) ──
+│   ├── swarm_health.py              # Aggregate health monitor + recommendations
+│   ├── disagreement_forensics.py    # Per-round failure root-cause analyzer
+│   ├── round_replay_advisor.py      # Counterfactual "what-if" round replay
+│   ├── agent_lifecycle_advisor.py   # Roster-level keep/watch/evict planner
+│   ├── leader_rotation_advisor.py   # Next-N-rounds leader schedule planner
+│   ├── voting_coalition_detector.py # Voting-bloc / faction detector
+│   ├── proposal_risk_scorer.py      # Pre-submission commit-risk advisor
+│   ├── threshold_tuning_advisor.py  # Threshold + slash-factor auto-tuner
+│   ├── vote_dispersion_advisor.py   # Vote-weight distribution pattern classifier
+│   │
+│   │ ── Adaptive Energy & Ecosystem ──
+│   ├── allostasis.py                # Predictive ("stability through change") regulation
+│   ├── hibernation.py               # Torpor/arousal energy-conservation engine
+│   ├── microbiome.py                # Commensal-agent ecosystem manager
+│   └── stats_utils.py               # Shared statistical helpers
 │
 ├── tests/                           # Test suite with fault injection
 ├── paper/                           # LaTeX source for the research paper
@@ -111,7 +127,7 @@ The heart of mBFT. `protocol.py` implements the four-phase consensus loop:
 
 ## Engine Subsystems
 
-The project has grown to 50+ specialized engines organized into six functional areas:
+The project has grown to 60+ specialized engines organized into six functional areas:
 
 | Area | Engines | Purpose |
 |------|---------|---------|
@@ -121,6 +137,8 @@ The project has grown to 50+ specialized engines organized into six functional a
 | **Bio-Inspired** | Morphogenesis, Epigenetics, Neuroplasticity, Speciation, Stigmergy, Quorum, Symbiosis, Angiogenesis, Chemotaxis, Mitosis, Proprioception | Biological system analogies |
 | **Collective Intelligence** | Consciousness, Dreaming, SwarmMemory, QuorumPredict, SocialLearning | Higher-order reasoning and anticipation |
 | **Dynamics** | Grudge, Influence, Monitor, Spectral, Emergence, Landscape, Regime, Cascade, Diversity, Learning, Tournament | Structural and temporal analysis |
+| **Agentic Advisors** | SwarmHealth, DisagreementForensics, RoundReplayAdvisor, AgentLifecycleAdvisor, LeaderRotationAdvisor, VotingCoalitionDetector, ProposalRiskScorer, ThresholdTuningAdvisor, VoteDispersionAdvisor | Read-only recommenders that observe history and emit prioritised playbooks |
+| **Adaptive Energy** | Allostasis, Hibernation, Microbiome | Predictive regulation, energy conservation, commensal-agent ecosystem |
 
 See the **[Engine Catalog](engines.md)** for detailed documentation of every engine, its module path, key classes, and purpose.
 
@@ -128,3 +146,4 @@ See the **[Engine Catalog](engines.md)** for detailed documentation of every eng
 
 - **`stats_utils.py`** — Statistical helper functions (mean, stddev, percentiles) used across engines
 - **`__init__.py`** — Package exports for clean imports
+

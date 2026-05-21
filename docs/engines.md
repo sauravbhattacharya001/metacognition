@@ -1,6 +1,6 @@
 # Engine Catalog
 
-mBFT includes 50+ specialized engines beyond the core consensus protocol. These engines extend the swarm with self-healing, governance, analysis, and bio-inspired behaviors.
+mBFT includes 60+ specialized engines beyond the core consensus protocol. These engines extend the swarm with self-healing, governance, analysis, bio-inspired behaviors, and a family of *agentic advisors* that operate as read-only recommenders alongside the protocol.
 
 ---
 
@@ -297,3 +297,75 @@ Competitive evaluation framework. `TeamConfig` pairings produce `MatchResult` da
 **Module:** `src/replay.py`
 
 Records consensus rounds as `RoundEvent` sequences. `ReplayData` bundles enable deterministic replay for debugging and analysis.
+
+---
+
+## Agentic Advisors
+
+A family of read-only, recommendation-emitting advisors that sit *alongside* the mBFT engine. None of them mutate engine state — they observe history (and, in some cases, draft proposals) and emit structured reports plus a prioritized playbook of conservative actions the operator (or an outer agent) can apply. Each advisor is deterministic given its inputs and pure-stdlib + pydantic on the data side.
+
+### SwarmHealthMonitor
+**Module:** `src/swarm_health.py`
+
+Aggregate observability layer. Given a sequence of `RoundResult` objects (typically `engine.history`) and the current reputation map, surfaces per-agent calibration scores, reputation drift / slash velocity, persistent dissenters, round-level health signals (commit rate, threshold margin), and emits a `SwarmHealthReport` of conservative `Recommendation` items (threshold up/down, slash factor up/down, agents to investigate).
+
+### DisagreementForensics
+**Module:** `src/disagreement_forensics.py`
+
+Post-mortem analyzer for *individual* non-committed rounds. For every failed round it classifies the blocker (`UNREFUTED_REJECTION` vs `BELOW_THRESHOLD`), attributes responsibility (leader / strongest dissenter / silent-majority underweight cohort), extracts the counter-proof chain, identifies the alternative leader the engine would have promoted, and packages `PatternFinding` entries plus a per-round `RoundForensics` into a `ForensicsReport`.
+
+### RoundReplayAdvisor
+**Module:** `src/round_replay_advisor.py`
+
+Counterfactual "what-if" engine. Re-plays each failed `RoundResult` under a catalogue of cheap interventions (lower threshold, swap leader to the strongest dissenter, demote a slashed agent's rejection, ignore a persistent dissenter, add a redundant agent) and projects which intervention would have flipped the outcome. Output: `ReplayReport` with ranked `InterventionOutcome` entries and a prioritized playbook.
+
+### AgentLifecycleAdvisor
+**Module:** `src/agent_lifecycle_advisor.py`
+
+Roster-level lifecycle planner. Assigns every known agent a verdict on the lifecycle ladder `KEEP → WATCH → PROBE → REINSTATE → DEMOTE → EVICT` based on history + reputation, with projected swarm impact for each transition. Emits a `LifecycleAdvisorReport` of `AgentLifecycle` verdicts and concrete `PlaybookItem` actions.
+
+### LeaderRotationAdvisor
+**Module:** `src/leader_rotation_advisor.py`
+
+Next-N-rounds leader rotation planner. Scores each agent's `lead_fitness` (0–100) over lead-success-rate, calibration, reputation, recency pressure, and penalties; assigns rotation verdicts `LEAD_NOW → LEAD_SOON → STANDBY → BENCH / SKIP / INSUFFICIENT_DATA`; and builds a deterministic forced-leader queue of length `horizon` (`LeaderRotationReport` + `LeaderSlot` schedule).
+
+### VotingCoalitionDetector
+**Module:** `src/voting_coalition_detector.py`
+
+Coalition / voting-bloc analyzer. Identifies which agents move as a pack across rounds and labels each bloc as healthy natural affinity, echo chamber, blocking minority, or dominant rubber-stamp faction. Output: `CoalitionReport` containing `Coalition` records and `PlaybookItem` mitigations.
+
+### ProposalRiskScorer
+**Module:** `src/proposal_risk_scorer.py`
+
+Pre-submission risk advisor. Given a draft `Proposal`, the leader's reputation, recent `engine.history`, and (optionally) the current voter roster, predicts whether the proposal will commit and emits a `ProposalRiskReport` with `RiskFactor` entries, `PredictedVoter` breakdown, and prioritised `PlaybookAction` items the leader can apply *before* burning a round.
+
+### ThresholdTuningAdvisor
+**Module:** `src/threshold_tuning_advisor.py`
+
+Auto-tuning advisor for the engine's `threshold` and `slash_factor` hyperparameters. Takes a `risk_appetite` (`cautious` / `balanced` / `aggressive`) and produces a `ThresholdTuningReport` of `TuningFinding` evidence and concrete `TuningRecommendation` deltas — the only advisor whose playbook directly proposes changes to engine constants.
+
+### VoteDispersionAdvisor
+**Module:** `src/vote_dispersion_advisor.py`
+
+Dispersion-pattern detector. Classifies each round's vote-weight distribution as one of `GROUPTHINK`, `ECHO_LEADER`, `POLARIZED`, `FRAGMENTED`, `HEDGED`, or `HEALTHY_DEBATE`, then composes a `DispersionPortfolio` across the engine's history. Distinct from `VotingCoalitionDetector` — that tells you *who* moves together; this tells you *how* the weights are shaped. Output: `DispersionReport` with `AgentContribution` and `PlaybookAction` entries.
+
+---
+
+## Adaptive Energy & Ecosystem
+
+Longer-horizon engines that regulate the swarm's energy budget and commensal ecosystem.
+
+### SwarmAllostasisEngine
+**Module:** `src/allostasis.py`
+
+Predictive ("stability through change") complement to `HomeostasisController`. Instead of reacting to deviations via PID, it anticipates future vital signs from contextual cues and pre-adjusts effectors *before* disruptions materialise (cf. cortisol release before a stressor, cardiovascular ramp-up before a starting gun). Uses per-vital sliding-window linear regression `PredictionModel`s plus `ContextCue`s to emit `AnticipatoryAdjustment` actions, an `AllostasisLoad` budget, and a periodic `AllostasisReport` with `HealthScore` + `Insight` annotations.
+
+### SwarmHibernationEngine
+**Module:** `src/hibernation.py`
+
+Energy-conservation engine modeled on mammalian hibernation. Each agent has an energy budget (0–100) and transitions through `HibernationState`s `ACTIVE → DROWSY → LIGHT_TORPOR → DEEP_TORPOR → AROUSING → ACTIVE`, with deep torpor running at ~5% of active metabolism. Tracks `TorporBout`s, `ScarcityEvent`s, `ArousalTrigger`s, and clusters of co-hibernating agents into `HibernationCluster`s. Output: `HibernationReport` with per-agent `AgentEnergyState` and overall `HealthScore`.
+
+### SwarmMicrobiomeEngine
+**Module:** `src/microbiome.py`
+
+Commensal-agent ecosystem manager, inspired by gut / skin / oral microbiota. Models background-service `MicrobeSpecies` agents that colonize host `NicheState`s (gut, skin, oral, respiratory, urogenital, neural), produce `Metabolite`s (SCFAs, vitamins, neurotransmitters, bile acids) consumed by host agents, and detects `DysbiosisEvent`s. Emits `Intervention` recommendations and a periodic `MicrobiomeSnapshot` / `MicrobiomeReport`.
