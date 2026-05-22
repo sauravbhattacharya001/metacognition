@@ -78,6 +78,14 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 class CellCyclePhase(str, Enum):
+    """Eukaryotic cell-cycle phases that an :class:`AgentCell` traverses.
+
+    Transitions are gated by checkpoint methods on
+    :class:`SwarmMitosisEngine` (G1/S, G2/M, spindle).  The values are
+    stable strings so they can be serialised in snapshots and HTML reports
+    without re-mapping.
+    """
+
     G0_QUIESCENT = "G0_QUIESCENT"
     G1_GROWTH = "G1_GROWTH"
     S_SYNTHESIS = "S_SYNTHESIS"
@@ -88,6 +96,15 @@ class CellCyclePhase(str, Enum):
 
 @dataclass
 class GrowthFactor:
+    """Diffusible mitogen that accumulates in the shared swarm pool.
+
+    Concentration rises as fit agents secrete the factor each tick and
+    decays geometrically by ``decay_rate``.  When the total concentration
+    of all growth factors exceeds
+    :attr:`SwarmMitosisEngine.growth_factor_threshold`, quiescent (G0)
+    cells are eligible to re-enter the cycle at G1.
+    """
+
     name: str
     potency: float = 0.5          # 0-1
     decay_rate: float = 0.05      # per tick
@@ -97,6 +114,12 @@ class GrowthFactor:
 
 @dataclass
 class Checkpoint:
+    """Descriptor for a cell-cycle checkpoint and its gating conditions.
+
+    The engine evaluates checkpoints via the private ``_check_*`` methods;
+    this dataclass is used to surface checkpoint metadata in reports.
+    """
+
     name: str
     phase: str                    # which transition it guards
     conditions: List[str] = field(default_factory=list)
@@ -105,6 +128,16 @@ class Checkpoint:
 
 @dataclass
 class AgentCell:
+    """Per-agent cell state tracked by the mitosis engine.
+
+    Carries everything the engine needs to advance one agent through the
+    cycle: current ``phase``, ``generation`` depth from its founder,
+    ``telomere_length`` (decremented on every division, Hayflick-like
+    limit when it hits zero), ``fitness``, ``nutrient_level``,
+    ``dna_integrity`` and a small ``traits`` dictionary that is inherited
+    (with gaussian mutation) by daughter cells.
+    """
+
     agent_id: str
     phase: CellCyclePhase = CellCyclePhase.G0_QUIESCENT
     generation: int = 0           # 0 = original founder
@@ -132,6 +165,13 @@ class AgentCell:
 
 @dataclass
 class DivisionEvent:
+    """Record of a single completed division (parent → child).
+
+    ``division_type`` is ``"symmetric"`` (two identical daughters) or
+    ``"asymmetric"`` (one specialised, one stem-like).  ``trait_mutations``
+    records the per-trait delta applied to the child.
+    """
+
     parent_id: str
     child_id: str
     tick: int
@@ -142,6 +182,14 @@ class DivisionEvent:
 
 @dataclass
 class ApoptosisEvent:
+    """Record of an agent's programmed death.
+
+    ``reason`` is a short tag (``"telomere"``, ``"dna_damage"``,
+    ``"low_fitness"``, ``"overcrowding"``, ``"manual"``…).  When the
+    dying agent transfers state to a neighbour the recipient id is stored
+    in ``knowledge_transferred_to``.
+    """
+
     agent_id: str
     tick: int
     reason: str
@@ -150,6 +198,12 @@ class ApoptosisEvent:
 
 @dataclass
 class MitosisSnapshot:
+    """Per-tick population summary appended by :meth:`SwarmMitosisEngine.tick`.
+
+    Snapshots are the time-series substrate consumed by the HTML
+    dashboard and the insight generator.
+    """
+
     tick: int
     population_size: int
     avg_fitness: float
@@ -164,6 +218,16 @@ class MitosisSnapshot:
 
 @dataclass
 class MitosisReport:
+    """Aggregate result of a simulation run.
+
+    Produced by :meth:`SwarmMitosisEngine.analyze` (and therefore by
+    :meth:`SwarmMitosisEngine.simulate`).  Contains the full snapshot
+    series, all division/apoptosis events, the reconstructed lineage
+    tree, a 0-100 ``overall_health`` score with a textual ``health_tier``
+    (``Thriving`` / ``Stable`` / ``Stressed`` / ``Declining`` /
+    ``Collapsing``) and human-readable ``insights``.
+    """
+
     snapshots: List[MitosisSnapshot] = field(default_factory=list)
     total_divisions: int = 0
     total_deaths: int = 0
@@ -240,14 +304,21 @@ class SwarmMitosisEngine:
 
     @property
     def tick_count(self) -> int:
+        """Number of ticks that have been simulated so far."""
         return self._tick
 
     @property
     def population(self) -> int:
+        """Current number of live agents in the swarm."""
         return len(self._agents)
 
     @property
     def agents(self) -> Dict[str, AgentCell]:
+        """Return a shallow copy of the live agent map (id → cell).
+
+        Returning a copy keeps callers from mutating engine-internal
+        state through the public surface.
+        """
         return dict(self._agents)
 
     # ------------------------------------------------------------------
@@ -257,6 +328,25 @@ class SwarmMitosisEngine:
     def add_growth_factor(self, name: str, potency: float = 0.5,
                           decay_rate: float = 0.05,
                           source: Optional[str] = None) -> GrowthFactor:
+        """Register a named growth factor in the shared mitogen pool.
+
+        Parameters
+        ----------
+        name:
+            Stable identifier (e.g. ``"default_mitogen"``).  An existing
+            factor with the same name is replaced.
+        potency:
+            Multiplier (0-1) applied to per-agent secretion this tick.
+        decay_rate:
+            Fraction of the standing concentration lost each tick.
+        source:
+            Optional originating agent id, recorded for provenance.
+
+        Returns
+        -------
+        GrowthFactor
+            The newly-registered factor, with ``concentration == 0``.
+        """
         gf = GrowthFactor(name=name, potency=potency, decay_rate=decay_rate,
                           source_agent=source)
         self._growth_factors[name] = gf
@@ -472,6 +562,12 @@ class SwarmMitosisEngine:
         return events
 
     def kill_agent(self, agent_id: str, reason: str = "manual") -> Optional[ApoptosisEvent]:
+        """Force-remove an agent and record an :class:`ApoptosisEvent`.
+
+        Useful for tests and external scheduling (e.g. an outer engine
+        that decides to cull underperformers).  Returns ``None`` if no
+        agent with ``agent_id`` is currently alive.
+        """
         cell = self._agents.pop(agent_id, None)
         if cell is None:
             return None
@@ -640,9 +736,15 @@ class SwarmMitosisEngine:
     # ------------------------------------------------------------------
 
     def get_lineage_tree(self) -> Dict[str, List[str]]:
+        """Return a copy of the parent → ``[children]`` lineage map.
+
+        Both live and dead agent ids may appear as keys/values; the map
+        is the authoritative ancestry record across the run.
+        """
         return dict(self._lineage)
 
     def get_agent(self, agent_id: str) -> Optional[AgentCell]:
+        """Look up a live agent by id, or ``None`` if it is dead/unknown."""
         return self._agents.get(agent_id)
 
     def _count_descendants(self, agent_id: str) -> int:
@@ -745,11 +847,21 @@ class SwarmMitosisEngine:
     # ------------------------------------------------------------------
 
     def simulate(self, ticks: int = 100) -> MitosisReport:
+        """Advance the engine ``ticks`` times and return the final report.
+
+        Equivalent to calling :meth:`tick` in a loop followed by
+        :meth:`analyze`.
+        """
         for _ in range(ticks):
             self.tick()
         return self.analyze()
 
     def analyze(self) -> MitosisReport:
+        """Build a :class:`MitosisReport` from the current engine state.
+
+        Safe to call at any time (including before any ticks have run);
+        does not mutate engine state.
+        """
         cells = list(self._agents.values())
         gen_dist: Dict[int, int] = defaultdict(int)
         for c in cells:
@@ -775,6 +887,12 @@ class SwarmMitosisEngine:
     # ------------------------------------------------------------------
 
     def export_json(self) -> Dict[str, Any]:
+        """Return the current report as a JSON-serialisable ``dict``.
+
+        Enum values are flattened to their string form and private
+        (underscore-prefixed) attributes are dropped so the payload is
+        safe to ``json.dumps`` directly.
+        """
         report = self.analyze()
         def _ser(obj: Any) -> Any:
             if hasattr(obj, '__dict__'):
@@ -794,6 +912,13 @@ class SwarmMitosisEngine:
         return _ser(report)
 
     def export_html(self, path: str) -> str:
+        """Render the interactive HTML dashboard to ``path``.
+
+        Writes a self-contained HTML file (no external assets) covering
+        the population timeline, generation distribution, phase
+        breakdown, health gauge, lineage snippet and insights.  Returns
+        the rendered HTML string for convenience (e.g. for tests).
+        """
         report = self.analyze()
         h = html_mod.escape
 
@@ -940,6 +1065,13 @@ SCENARIOS = {
 
 
 def main(argv: Optional[List[str]] = None) -> None:
+    """Command-line entry point for ``python -m src.mitosis``.
+
+    Parses scenario/overrides, runs a simulation, prints a textual
+    summary to stdout, and optionally writes ``--out`` HTML and
+    ``--json`` artefacts.  ``argv`` is forwarded to ``argparse``; pass
+    ``None`` to consume ``sys.argv`` as usual.
+    """
     parser = argparse.ArgumentParser(description="Swarm Mitosis Engine — autonomous agent replication")
     parser.add_argument("--agents", type=int, default=None, help="Initial agent count")
     parser.add_argument("--capacity", type=int, default=None, help="Carrying capacity")
