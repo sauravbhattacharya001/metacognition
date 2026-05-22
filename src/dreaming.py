@@ -317,6 +317,13 @@ class RecombinationEngine:
 
         # Recombine random pairs
         num_hypotheses = min(5, len(fragments) // 2)
+        # Hoist invariant lookups out of the hot loop:
+        #   - successful_sources used to do `sum(1 for t, s in solutions if t in source_tasks)`
+        #     - O(len(solutions)) per iteration. Use a Counter once instead.
+        #   - novelty did `combined in [s for _, s in solutions]` - rebuilt a list every
+        #     iteration (O(len(solutions)) build + O(n) `in`). Use a set once instead.
+        task_counts: Counter[str] = Counter(t for t, _ in solutions)
+        existing_solutions = {s for _, s in solutions}
         for _ in range(num_hypotheses):
             if len(fragments) < 2:
                 break
@@ -326,13 +333,12 @@ class RecombinationEngine:
                 continue  # skip same-source combinations
 
             combined = f"{f1[1]}-{f2[1]}"
-            # Lucidity: higher if fragments come from successful episodes
+            # Lucidity: higher if fragments come from successful episodes.
+            # Two distinct sources by construction (f1[0] != f2[0] checked above).
             source_tasks = [f1[0], f2[0]]
-            successful_sources = sum(
-                1 for t, s in solutions if t in source_tasks
-            )
+            successful_sources = task_counts.get(f1[0], 0) + task_counts.get(f2[0], 0)
             lucidity = successful_sources / max(len(source_tasks), 1)
-            novelty = 1.0 - (1.0 if combined in [s for _, s in solutions] else 0.0)
+            novelty = 1.0 - (1.0 if combined in existing_solutions else 0.0)
 
             hypotheses.append(Hypothesis(
                 description=f"Hybrid approach: {combined}",
