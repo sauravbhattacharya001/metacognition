@@ -119,8 +119,13 @@ class PheromoneDeposit:
 
     @property
     def deposit_id(self) -> str:
-        return hashlib.md5(
-            f"{self.agent_id}:{self.ptype.value}:{self.x},{self.y}:{self.tick_deposited}".encode()
+        # Non-cryptographic deposit identifier - only used for de-duplication
+        # and lookup keys, never to authenticate or integrity-check data.
+        # Mark ``usedforsecurity=False`` so the call passes Bandit (B324) and
+        # remains usable on FIPS-restricted Python interpreters.
+        return hashlib.md5(  # noqa: S324  # nosec B324
+            f"{self.agent_id}:{self.ptype.value}:{self.x},{self.y}:{self.tick_deposited}".encode(),
+            usedforsecurity=False,
         ).hexdigest()[:12]
 
 

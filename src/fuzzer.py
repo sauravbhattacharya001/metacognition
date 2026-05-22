@@ -126,7 +126,13 @@ class MutationPlan:
     @property
     def fingerprint(self) -> str:
         key = "|".join(sorted(self.ops))
-        return hashlib.md5(key.encode()).hexdigest()[:8]
+        # Non-cryptographic fingerprint (deduplication/identity only). MD5 is
+        # used purely for its short, deterministic digest; mark explicitly with
+        # ``usedforsecurity=False`` so FIPS/Bandit (B324) won't flag it and so
+        # the intent is unambiguous to future readers.
+        return hashlib.md5(  # noqa: S324  # nosec B324
+            key.encode(), usedforsecurity=False
+        ).hexdigest()[:8]
 
 
 def generate_mutation_plan(agent_ids: List[str], rng: random.Random,
