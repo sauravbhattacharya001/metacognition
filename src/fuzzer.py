@@ -618,9 +618,9 @@ async def main() -> None:
     if args.export:
         path = Path(args.export)
         if path.suffix == ".json":
-            path.write_text(json.dumps(_build_json_report(outcomes, stats), indent=2))
+            path.write_text(json.dumps(_build_json_report(outcomes, stats), indent=2), encoding="utf-8")
         else:
-            path.write_text(_generate_html(outcomes, stats))
+            path.write_text(_generate_html(outcomes, stats), encoding="utf-8")
         print()
         print("📄 Report exported to " + str(path))
 
