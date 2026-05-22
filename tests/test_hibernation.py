@@ -1,24 +1,18 @@
 """Tests for Swarm Hibernation Engine."""
 import json
-import math
 import tempfile
 from pathlib import Path
 
 import pytest
 
 from src.hibernation import (
-    AgentEnergyState,
-    ArousalEvent,
     ArousalTrigger,
     HealthScore,
-    HibernationCluster,
     HibernationReport,
     HibernationState,
     SCENARIOS,
-    ScarcityEvent,
     ScarcityLevel,
     SwarmHibernationEngine,
-    TorporBout,
     _METABOLIC_MULTIPLIER,
 )
 

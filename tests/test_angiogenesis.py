@@ -6,8 +6,6 @@ import tempfile
 import pytest
 
 from src.angiogenesis import (
-    AgentNode,
-    AngiogenesisEvent,
     AngiogenesisReport,
     DemandSignal,
     DemandType,

@@ -4,7 +4,6 @@ from __future__ import annotations
 import copy
 from datetime import datetime, timezone
 
-import pytest
 
 from src.core.state import RoundResult, Vote
 from src.vote_dispersion_advisor import (

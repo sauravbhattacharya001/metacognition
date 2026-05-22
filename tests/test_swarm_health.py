@@ -7,12 +7,9 @@ import pytest
 
 from src.agents.metacognitive import MockAgent
 from src.core.protocol import MBFTEngine
-from src.core.state import Proposal, RoundResult, Vote
+from src.core.state import RoundResult, Vote
 from src.swarm_health import (
-    AgentHealth,
-    Recommendation,
     SwarmHealthMonitor,
-    SwarmHealthReport,
 )
 
 

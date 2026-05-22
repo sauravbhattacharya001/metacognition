@@ -1,19 +1,15 @@
 """Tests for Swarm Senescence Engine."""
 import json
-import math
 import tempfile
 from pathlib import Path
 
 import pytest
 
 from src.senescence import (
-    AgentBiology,
-    HealthScore,
     PopulationStats,
     RejuvenationEvent,
     RejuvenationMethod,
     RetirementReason,
-    RetirementRecord,
     SASPSignal,
     SCENARIOS,
     SenescenceReport,

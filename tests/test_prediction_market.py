@@ -2,20 +2,13 @@
 from __future__ import annotations
 
 import json
-import math
 import tempfile
 from pathlib import Path
 
 import pytest
 
 from src.prediction_market import (
-    AgentPortfolio,
-    Market,
-    MarketSnapshot,
-    MarketVerdict,
-    Position,
     PredictionMarketEngine,
-    Trade,
     lmsr_cost,
     lmsr_price_yes,
 )

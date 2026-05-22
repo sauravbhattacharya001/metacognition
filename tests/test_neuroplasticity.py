@@ -10,8 +10,6 @@ from src.neuroplasticity import (
     NeuroplasticityReport,
     NetworkSnapshot,
     PlasticityEvent,
-    PlasticityRecord,
-    Synapse,
     SynapseState,
 )
 
@@ -284,7 +282,7 @@ class TestCriticalPeriod:
         w2 = syn.weight
 
         # The critical-period step should have bigger increase
-        delta_normal = w1 - 0.3  # first activation from base 0.3
+        w1 - 0.3  # first activation from base 0.3
         delta_critical = w2 - w1  # second activation during critical period
         # Both are positive; critical should be larger (2x learning rate)
         assert delta_critical > 0

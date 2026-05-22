@@ -183,11 +183,11 @@ class TestSimulation:
         random.seed(42)
         eng1 = DiplomacyEngine(n_agents=4, n_byzantine=1,
                                n_rounds=5, n_tasks=3, seed=42)
-        s1 = eng1.run_simulation(verbose=False)
+        eng1.run_simulation(verbose=False)
         random.seed(42)
         eng2 = DiplomacyEngine(n_agents=4, n_byzantine=1,
                                n_rounds=5, n_tasks=3, seed=42)
-        s2 = eng2.run_simulation(verbose=False)
+        eng2.run_simulation(verbose=False)
         assert len(eng1.vote_matrix) == len(eng2.vote_matrix)
         for t in range(len(eng1.vote_matrix)):
             for r in range(len(eng1.vote_matrix[t])):
@@ -385,13 +385,13 @@ class TestEdgeCases:
     def test_single_task(self):
         eng = DiplomacyEngine(n_agents=4, n_byzantine=1,
                               n_rounds=5, n_tasks=1, seed=42)
-        summary = eng.run_simulation(verbose=False)
+        eng.run_simulation(verbose=False)
         assert len(eng.vote_matrix) == 1
 
     def test_single_round(self):
         eng = DiplomacyEngine(n_agents=4, n_byzantine=1,
                               n_rounds=1, n_tasks=3, seed=42)
-        summary = eng.run_simulation(verbose=False)
+        eng.run_simulation(verbose=False)
         for t in range(3):
             assert len(eng.vote_matrix[t]) == 1
 

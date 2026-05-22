@@ -1,10 +1,7 @@
 """Tests for Swarm Dreaming Engine."""
 import json
-import time
-import tempfile
 from pathlib import Path
 
-import pytest
 
 from src.dreaming import (
     AnticipationEngine,

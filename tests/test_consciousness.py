@@ -1,20 +1,14 @@
 """Tests for the Swarm Consciousness Engine."""
 import json
-import math
 import tempfile
 from pathlib import Path
 
 import pytest
 
 from src.consciousness import (
-    AgentBelief,
-    AttentionEvent,
     ConsciousnessReport,
     ConsciousnessSnapshot,
-    IntentSignal,
-    PHASE_THRESHOLDS,
     SwarmConsciousnessEngine,
-    ThoughtContagion,
     run_demo,
 )
 

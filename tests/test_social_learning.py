@@ -1,23 +1,16 @@
 """Tests for Swarm Social Learning Engine."""
 import json
-import math
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from src.social_learning import (
     AgentProfile,
-    CulturalHealthReport,
-    CulturalLineage,
-    Insight,
-    LearningEvent,
     LearningMode,
     Skill,
     SkillComplexity,
     SocialLearningEngine,
-    SimulationReport,
     COMPLEXITY_LEVELS,
 )
 

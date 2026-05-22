@@ -1,6 +1,5 @@
 """Tests for Swarm Morphogenesis Engine."""
 import json
-import math
 import os
 import sys
 import tempfile
@@ -8,14 +7,10 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.morphogenesis import (
-    AgentCell,
-    ApoptosisEvent,
     CellFate,
     DevelopmentalStage,
-    InductionEvent,
     MorphogenesisEngine,
     MorphogenesisReport,
-    MorphogenSource,
     MorphogenType,
     PatternType,
     RegenerationEvent,
@@ -455,7 +450,7 @@ def test_full_lifecycle():
     assert len(removed) > 0
 
     # Regenerate
-    event = engine.regenerate()
+    engine.regenerate()
 
     # Final analysis
     report2 = engine.analyze()

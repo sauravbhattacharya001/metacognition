@@ -18,14 +18,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from pathlib import Path
 
 import pytest
 
 from src.agents.metacognitive import MockAgent
-from src.core.protocol import MBFTEngine
-from src.core.state import Proposal, RoundResult, Vote
+from src.core.state import Proposal
 from src.lineage import (
     ConsensusLineageTracker,
     InstrumentedEngine,

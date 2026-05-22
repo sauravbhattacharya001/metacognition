@@ -1,6 +1,5 @@
 """Tests for Swarm Epigenetics Engine."""
 import json
-import math
 import os
 import sys
 import tempfile
@@ -10,16 +9,11 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.epigenetics import (
-    DEFAULT_GENOME,
     EpigeneticMark,
     EpigeneticsEngine,
     EpigeneticsReport,
     Epigenome,
-    EnvironmentalSignal,
-    Gene,
     GeneCategory,
-    GenerationSnapshot,
-    InheritanceEvent,
     MarkType,
     SignalType,
     run_demo,
@@ -353,7 +347,7 @@ class TestInheritance:
         engine.reproduce("gen2", "gen3")
         # Check that mark propagated (may degrade)
         gen3 = engine.agents["gen3"]
-        stress_marks = [m for m in gen3.marks if "stress" in m.source]
+        [m for m in gen3.marks if "stress" in m.source]
         # With 90% fidelity across 3 generations: 0.9^3 = 72.9% chance
         # It's probabilistic but seed=42 should give predictable results
         assert gen3.generation == 3

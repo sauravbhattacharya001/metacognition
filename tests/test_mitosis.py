@@ -8,11 +8,7 @@ import tempfile
 import pytest
 
 from src.mitosis import (
-    AgentCell,
-    ApoptosisEvent,
     CellCyclePhase,
-    DivisionEvent,
-    GrowthFactor,
     MitosisReport,
     MitosisSnapshot,
     SwarmMitosisEngine,

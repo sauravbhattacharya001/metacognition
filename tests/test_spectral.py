@@ -272,7 +272,7 @@ class TestPerfRegression:
 
         sig = [math.cos(2 * math.pi * 3 * i / 32) for i in range(32)]
         data = _make_data({"a": sig, "b": sig, "c": sig}, aggregate_series=sig)
-        result = analyze_spectral(data)
+        analyze_spectral(data)
 
         # analyze_spectral now inlines the FFT/power/phase computation for
         # per-agent series. The single remaining call to ``power_spectrum`` is

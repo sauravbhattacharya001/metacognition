@@ -10,13 +10,10 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.microbiome import (
-    DEFAULT_NICHES,
     DysbiosisEvent,
     Intervention,
     Metabolite,
     MicrobeSpecies,
-    MicrobiomeReport,
-    MicrobiomeSnapshot,
     NicheState,
     SwarmMicrobiomeEngine,
 )
@@ -352,14 +349,14 @@ class TestAntibioticDisruption:
         assert after_bact < before_bact
 
     def test_broad_spectrum_spares_resistant(self, configured_engine):
-        before_cd = configured_engine.get_abundance("C.difficile", "gut")
+        configured_engine.get_abundance("C.difficile", "gut")
         configured_engine.apply_intervention(
             Intervention(intervention_type="antibiotic", spectrum="broad", strength=0.8)
         )
         after_cd = configured_engine.get_abundance("C.difficile", "gut")
         # C.difficile has broad susceptibility 0.2, so kill = 0.2*0.8 = 0.16
         # Should survive more than commensals
-        after_bact = configured_engine.get_abundance("Bacteroides", "gut")
+        configured_engine.get_abundance("Bacteroides", "gut")
         # Relative ratio should increase
         assert after_cd > 0  # Still alive
 
@@ -571,7 +568,6 @@ class TestCLI:
         assert callable(main)
 
     def test_argparse(self):
-        import argparse
         from src.microbiome import main
         # Just verify the function exists and is callable
         assert main is not None
@@ -587,14 +583,14 @@ class TestIntegration:
         """Full simulation: grow, disrupt, recover, analyze."""
         # Phase 1: Growth
         configured_engine.tick(steps=20)
-        health_before = configured_engine.analyze().overall_health
+        configured_engine.analyze().overall_health
 
         # Phase 2: Antibiotic
         configured_engine.apply_intervention(
             Intervention(intervention_type="antibiotic", spectrum="broad", strength=0.8)
         )
         configured_engine.tick(steps=5)
-        health_during = configured_engine.analyze().overall_health
+        configured_engine.analyze().overall_health
 
         # Phase 3: Recovery with probiotic
         probiotic = MicrobeSpecies(
@@ -605,7 +601,7 @@ class TestIntegration:
             intervention_type="probiotic", species_to_introduce=probiotic,
         ))
         configured_engine.tick(steps=20)
-        health_after = configured_engine.analyze().overall_health
+        configured_engine.analyze().overall_health
 
         report = configured_engine.analyze()
         assert report.total_dysbiosis_events >= 0

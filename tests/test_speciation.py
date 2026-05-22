@@ -3,11 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-import math
 import os
 import sys
 
-import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -25,8 +23,6 @@ from src.speciation import (
     _kmeans,
     run_simulation,
 )
-from src.agents.metacognitive import MockAgent
-from src.core.protocol import MBFTEngine
 from src.core.state import RoundResult, Vote
 
 
@@ -298,7 +294,7 @@ class TestSpeciationEvents:
         eng.update_fitness_profiles()
         eng.detect_species(k=3)
         eng.detect_speciation_events()
-        first_names = {sp.name for sp in eng.species}
+        {sp.name for sp in eng.species}
 
         # Phase 2: radically different data - only a5/a6 active, others gone
         for i in range(30, 60):
@@ -311,7 +307,7 @@ class TestSpeciationEvents:
         eng.detect_species(k=2)
         events = eng.detect_speciation_events()
         # Should detect formation of new species names or extinction of old ones
-        event_types = {e.event_type for e in events}
+        {e.event_type for e in events}
         assert len(events) > 0
 
     def test_adaptation_or_change_event(self):

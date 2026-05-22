@@ -3,15 +3,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pytest
 
 from src.core.state import Proposal, RoundResult, Vote
 from src.proposal_risk_scorer import (
-    PlaybookAction,
-    PredictedVoter,
-    ProposalRiskReport,
     ProposalRiskScorer,
-    RiskFactor,
 )
 
 

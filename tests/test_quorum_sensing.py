@@ -1,6 +1,5 @@
 """Tests for Swarm Quorum Sensing Engine."""
 import json
-import math
 import os
 import sys
 import tempfile
@@ -10,11 +9,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.quorum_sensing import (
-    BehaviorProgram,
     QuorumReport,
-    QuorumSnapshot,
-    SignalChannel,
-    SignalEvent,
     SwarmQuorumSensingEngine,
 )
 
@@ -222,7 +217,7 @@ class TestThresholdActivation:
         # Actually: concentration = 2.5 + 10 = 12.5 (at tick before decay)
         # Wait — produce happens before tick. Let me re-check logic.
         # After tick: decay then check. Let's just verify final state.
-        snap = engine.tick()  # more decay
+        engine.tick()  # more decay
         # Eventually it will deactivate when < 2.0 (threshold - hysteresis)
 
     def test_newly_activated_reported(self, configured_engine):

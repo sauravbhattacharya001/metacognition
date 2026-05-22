@@ -1,6 +1,5 @@
 """Tests for Swarm Nociception Engine."""
 import json
-import math
 import os
 import sys
 import tempfile
@@ -15,24 +14,17 @@ from src.nociception import (
     FIBER_PROFILES,
     GateControlModulator,
     GateState,
-    HealthScore,
     HealthTier,
-    Insight,
     InsightSeverity,
     NociceptiveHealthScorer,
-    NociceptionInsightGenerator,
     NociceptionReport,
     NociceptorArray,
-    Nociceptor,
-    PainMemory,
     PainMemoryEngine,
     PainPhase,
-    PainSignal,
     PainSignalPropagator,
     PathologyType,
     ProtectiveReflexEngine,
     REFLEX_PROFILES,
-    ReflexEvent,
     ReflexType,
     SCENARIOS,
     STIMULUS_PROFILES,
@@ -242,7 +234,7 @@ class TestProtectiveReflexEngine:
         assert len(reflexes) > 0
 
     def test_cooldown_prevents_rapid_fire(self):
-        r1 = self.engine.evaluate("agent-0", 0.8, StimulusType.MECHANICAL, tick=1)
+        self.engine.evaluate("agent-0", 0.8, StimulusType.MECHANICAL, tick=1)
         r2 = self.engine.evaluate("agent-0", 0.8, StimulusType.MECHANICAL, tick=2)
         assert len(r2) == 0  # Cooldown active
 

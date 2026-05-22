@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 import json
-import math
 import os
 import tempfile
 from pathlib import Path
 
-import pytest
 
 from src.allostasis import (
     AllostasisLoad,
@@ -19,20 +17,15 @@ from src.allostasis import (
     INSIGHT_ADAPTATION_REC,
     INSIGHT_CHRONIC_FATIGUE,
     INSIGHT_CUE_OBSOLESCENCE,
-    INSIGHT_FALSE_ALARM,
     INSIGHT_LOAD_WARNING,
     INSIGHT_PREDICTION_DRIFT,
-    INSIGHT_ANTICIPATION_SUCCESS,
     LOAD_WEIGHTS,
-    LOWER_IS_BETTER,
     MODE_ANTICIPATORY,
     MODE_MIXED,
     MODE_REACTIVE,
-    PredictionModel,
     SCENARIOS,
     SwarmAllostasisEngine,
     VITAL_NAMES,
-    VitalReading,
     _linear_regression,
 )
 
@@ -295,7 +288,7 @@ class TestAnticipatoryAdjustments:
         # Manually trigger with rising trend
         for i in range(10):
             e.record_vitals({"consensus_latency": 1.0 + i * 0.5})
-            adj = e.tick()
+            e.tick()
             # Should not generate adjustments in reactive mode
         # Verify mode stayed reactive
         assert e.mode in [MODE_REACTIVE, MODE_MIXED, MODE_ANTICIPATORY]
@@ -305,7 +298,7 @@ class TestAnticipatoryAdjustments:
         # Build up a rising latency trend
         for i in range(20):
             e.record_vitals(_base_vitals(consensus_latency=1.0 + i * 0.2))
-            adj = e.tick()
+            e.tick()
         # At some point adjustments should fire
         assert len(e.adjustment_history) >= 0  # depends on confidence
 
@@ -396,7 +389,6 @@ class TestAllostasisLoad:
         e.load.adjustment_frequency = 0.8
         e.load.false_alarm_rate = 0.8
         e.load.cue_saturation = 0.5
-        initial_debt = e.load.recovery_debt
         _run_n_cycles(e, 5)
         # Recovery debt may increase
         assert e.load.recovery_debt >= 0

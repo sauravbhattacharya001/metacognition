@@ -2,29 +2,19 @@
 from __future__ import annotations
 
 import json
-import math
 import tempfile
-import time
 from pathlib import Path
 
 import pytest
 
 from src.homeostasis import (
-    ACCEPTABLE_BAND,
-    CRITICAL_THRESHOLDS,
     DEFAULT_EFFECTORS,
     DEFAULT_SETPOINTS,
     EFFECTOR_BOUNDS,
     EFFECTOR_NAMES,
-    LOWER_IS_BETTER,
     VITAL_NAMES,
-    VITAL_WEIGHTS,
-    ControlLoop,
-    EffectorState,
-    HealthReport,
     HomeostasisController,
     HomeostasisSnapshot,
-    VitalReading,
 )
 
 

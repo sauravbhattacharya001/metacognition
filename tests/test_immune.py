@@ -5,7 +5,6 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
 
 from src.immune import (
     Antibody,
@@ -233,7 +232,7 @@ class TestDetection:
             rr = _make_round(round_index=i, agents=agents)
             rr["proposals"]["a1"]["confidence"] = 0.9
             rr["votes"]["a1"]["approve"] = False
-            pathogens = sys.scan_round(rr)
+            sys.scan_round(rr)
 
         # After several rounds, should detect byzantine
         all_pathogens = sys.memory.pathogen_history

@@ -10,9 +10,6 @@ import pytest
 
 from src.swarm_memory import (
     Episode,
-    MemoryHealth,
-    Pattern,
-    Recommendation,
     SwarmMemory,
     _agent_band,
     _jaccard,

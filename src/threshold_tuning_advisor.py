@@ -33,7 +33,7 @@ from __future__ import annotations
 import json
 import statistics
 from datetime import datetime
-from typing import Callable, Iterable, List, Mapping, Optional, Sequence
+from typing import Callable, List, Mapping, Optional, Sequence
 
 from pydantic import BaseModel, Field
 

@@ -1,20 +1,15 @@
 """Tests for Swarm Symbiosis Engine."""
 import json
-import math
 import os
 import sys
 import tempfile
-import time
 
-import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.symbiosis import (
     DependencyType,
     Interaction,
-    MutualismOpportunity,
-    ParasiteAlert,
     RelationshipType,
     SymbiosisEngine,
     SymbiosisReport,

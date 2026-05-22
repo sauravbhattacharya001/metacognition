@@ -15,7 +15,6 @@ Covers:
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import re
 from pathlib import Path
@@ -23,11 +22,9 @@ from pathlib import Path
 import pytest
 
 from src.agents.metacognitive import MockAgent
-from src.core.state import RoundResult
 from src.partition import (
     NetworkPartitionSimulator,
     Partition,
-    PartitionEvent,
     PartitionResult,
     PartitionStrategy,
     build_agents,

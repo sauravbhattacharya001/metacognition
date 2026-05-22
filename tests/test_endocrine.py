@@ -1,9 +1,7 @@
 """Tests for Swarm Endocrine Engine."""
 import json
 import math
-import os
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -23,21 +21,16 @@ from src.endocrine import (
     GlandController,
     HealthScore,
     HealthTier,
-    HormoneLevel,
     HormoneType,
     HormonalCascadeEngine,
     HORMONE_PROFILES,
     EVENT_HORMONE_MAP,
-    CASCADE_RULES,
-    FEEDBACK_RULES,
-    Insight,
     InsightGenerator,
     InsightSeverity,
     ReceptorBindingEngine,
     ReceptorState,
     SCENARIOS,
     SwarmEndocrineEngine,
-    AgentEndocrineState,
     run_demo,
     main,
 )
@@ -291,7 +284,7 @@ class TestReceptorBindingEngine:
     def test_auto_register_on_bind(self):
         rbe = ReceptorBindingEngine()
         concs = {h: 0.5 for h in HormoneType}
-        bound = rbe.bind("new_agent", concs)
+        rbe.bind("new_agent", concs)
         assert "new_agent" in rbe.agent_receptors
 
     def test_get_receptor_states(self):

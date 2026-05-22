@@ -4,13 +4,9 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-import pytest
 
 from src.agent_lifecycle_advisor import (
-    AgentLifecycle,
     AgentLifecycleAdvisor,
-    LifecycleAdvisorReport,
-    PlaybookItem,
 )
 from src.core.state import RoundResult, Vote
 

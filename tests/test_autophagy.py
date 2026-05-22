@@ -10,10 +10,8 @@ import pytest
 from src.autophagy import (
     AutophagyEngine,
     AutophagyReport,
-    Dysfunction,
     RecycleEntry,
     MODES,
-    DYSFUNCTION_CATEGORIES,
     STALE_THRESHOLD_ROUNDS,
     MEMORY_ZOMBIE_THRESHOLD,
     WASTE_AGE_THRESHOLD,

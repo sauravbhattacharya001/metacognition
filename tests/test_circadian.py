@@ -1,10 +1,8 @@
 """Tests for the Swarm Circadian Engine."""
 from __future__ import annotations
 
-import json
 import math
 import os
-import random
 import sys
 import tempfile
 
@@ -12,14 +10,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.circadian import (
     CircadianEngine,
-    ChronotypeProfile,
-    CollectiveReport,
-    EntrainmentPair,
-    JetlagReport,
-    OptimalWindow,
-    METRIC_NAMES,
-    CHRONOTYPES,
-    NUM_BINS,
 )
 
 

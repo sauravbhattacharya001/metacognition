@@ -1,5 +1,4 @@
 """Tests for Swarm Stigmergy Engine."""
-import math
 import sys
 from pathlib import Path
 
