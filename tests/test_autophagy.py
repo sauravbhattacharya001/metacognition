@@ -547,3 +547,103 @@ class TestEdgeCases:
         e.get_report()
         e.get_report()
         assert len(e.score_history) == 3
+
+
+# ---------------------------------------------------------------------------
+# Protein Misfolding Detection — O(K) refactor invariants (run #4443)
+# ---------------------------------------------------------------------------
+# These tests pin down the semantics that the O(n_keys**2) -> O(n_keys)
+# refactor of _detect_protein_misfolding relies on. They are deliberately
+# property-style so any future change that drifts from the bucket-count
+# formula will trip at least one assertion.
+
+class TestProteinMisfoldingBucketSemantics:
+    """The O(K) implementation derives `conflicts` from bucket counts.
+
+    Conflict count formula (must hold for any belief dict):
+        conflicts = (#True * #False) + ((#True + #pos_num) * #neg_num)
+    where `#pos_num` / `#neg_num` count *non-bool* numerics with
+    strictly positive / strictly negative values, and #True / #False
+    count bools (which in Python are also int but get the bool arm).
+    """
+
+    @staticmethod
+    def _detect(beliefs):
+        e = make_engine()
+        e.record_round(1, {"agent": {
+            "votes": 1, "memory_accesses": 1, "state_updates": 1,
+            "beliefs": beliefs,
+        }})
+        return [d for d in e.detect() if d.category == "protein_misfolding"]
+
+    def test_all_bools_one_class_no_conflict(self):
+        # 4 `True` and 0 `False` -> bool*bool conflicts = 0, no numerics,
+        # so total_pairs = 6, conflicts = 0, ratio = 0 -> nothing flagged.
+        assert self._detect({"a": True, "b": True, "c": True, "d": True}) == []
+
+    def test_bool_split_above_threshold(self):
+        # 2 True + 2 False -> conflicts = 2*2 = 4 out of C(4,2)=6 = 0.666
+        # which exceeds MISFOLDING_CONFLICT_THRESHOLD (0.5).
+        out = self._detect({"a": True, "b": True, "c": False, "d": False})
+        assert len(out) == 1
+        # severity is min(1.0, conflict_ratio); 4/6 ≈ 0.667.
+        assert 0.6 < out[0].severity < 0.7
+
+    def test_numeric_signs_only(self):
+        # 2 pos + 2 neg numerics -> 2*2 = 4 conflicts / 6 pairs = 0.667.
+        out = self._detect({"a": 1.0, "b": 2.0, "c": -1.0, "d": -3.0})
+        assert len(out) == 1
+
+    def test_zero_numeric_never_conflicts(self):
+        # 0.0 is neither >0 nor <0; pairs with it never count as conflict.
+        # 1 pos + 1 zero + 1 neg -> 1*1 = 1 conflict / 3 pairs = 0.333 < 0.5.
+        assert self._detect({"a": 1.0, "b": 0.0, "c": -1.0}) == []
+
+    def test_true_bool_acts_as_positive_against_negative_number(self):
+        # `True` is a bool (so it's not in #pos_num), but it is also an
+        # int, and the original elif arm fired for (bool, number) pairs
+        # when their signs differed. The bucket formula encodes this via
+        # the `(#True + #pos_num) * #neg_num` term.
+        # Setup: 1 True, 0 False, 0 #pos_num, 3 #neg_num. Pairs = C(4,2)=6.
+        # bool*bool conflicts = 1*0 = 0.
+        # mixed-sign conflicts = (1+0) * 3 = 3 -> ratio = 3/6 = 0.5 (>=0.5).
+        out = self._detect({"flag": True, "x": -1.0, "y": -2.0, "z": -3.0})
+        assert len(out) == 1
+
+    def test_false_bool_never_creates_sign_conflict(self):
+        # `False` is bool, so it's excluded from #pos_num and #neg_num.
+        # 1 False + 3 negatives -> bool*bool = 0, mixed = (0+0)*3 = 0.
+        assert self._detect({"flag": False, "x": -1.0, "y": -2.0, "z": -3.0}) == []
+
+    def test_non_numeric_values_ignored_but_count_in_pairs(self):
+        # Strings / None never go into any bucket but they still take up
+        # a slot in total_pairs = C(n,2). 2 pos + 2 neg = 4 conflicts;
+        # adding 2 strings pushes total_pairs from 6 to 15, ratio = 4/15
+        # ≈ 0.267 < 0.5, so nothing should be flagged.
+        beliefs = {"a": 1.0, "b": 2.0, "c": -1.0, "d": -2.0,
+                   "e": "hello", "f": None}
+        assert self._detect(beliefs) == []
+
+    def test_large_belief_set_is_fast(self):
+        # Sanity check that the O(K) path doesn't accidentally regress
+        # back to O(K**2). With K=500 the old code did 124k pair
+        # comparisons + isinstance checks per agent per detect(); the
+        # bucket form is a single 500-element pass. Wall-clock budget is
+        # generous (1s) so this is not flaky, but the old implementation
+        # already creeps into 10s of ms here, so any reintroduced
+        # quadratic walk would show up as a regression on CI.
+        import time
+        beliefs = {f"k{i}": (1.0 if i % 2 == 0 else -1.0) for i in range(500)}
+        e = make_engine()
+        e.record_round(1, {"agent": {
+            "votes": 1, "memory_accesses": 1, "state_updates": 1,
+            "beliefs": beliefs,
+        }})
+        t0 = time.perf_counter()
+        dys = e.detect()
+        elapsed = time.perf_counter() - t0
+        assert elapsed < 1.0, f"detect() took {elapsed:.3f}s for K=500 beliefs"
+        misfolded = [d for d in dys if d.category == "protein_misfolding"]
+        # 250 pos + 250 neg numerics -> 250*250 = 62500 conflicts /
+        # C(500,2) = 124750 pairs ≈ 0.5008 -> just over threshold.
+        assert len(misfolded) == 1

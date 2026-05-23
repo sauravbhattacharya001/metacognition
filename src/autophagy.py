@@ -546,23 +546,59 @@ class AutophagyEngine:
             _, latest = history[-1]
             if not latest.beliefs:
                 continue
-            # Check for contradictions: beliefs with conflicting values
+            # Check for contradictions: beliefs with conflicting values.
+            #
+            # Perf: the original implementation enumerated every unordered
+            # ``(i, j)`` pair in ``O(K**2)`` and rechecked the type of each
+            # value on every pair. This runs on every agent on every
+            # round of the autophagy engine, so it shows up in profiles
+            # even at small ``K``.
+            #
+            # The two conflict rules only depend on the *counts* of each
+            # value class, not on the specific pair, so we can replace
+            # the pair walk with a single O(K) bucket pass that produces
+            # the same conflict count:
+            #
+            #   * ``bool`` vs ``bool`` (both ``isinstance(bool)``) —
+            #     conflict iff the two values differ. Unordered count
+            #     of distinct booleans is ``#True * #False``.
+            #   * Otherwise, if both values are numeric (the elif arm in
+            #     the original code), conflict iff the signs are
+            #     opposite. Crucially, in Python ``isinstance(True,
+            #     int)`` is True, so ``True`` contributes to the positive
+            #     bucket when paired with a non-bool negative number
+            #     (the original elif fired for mixed bool/number pairs).
+            #     ``False`` is neither >0 nor <0 so it never produces a
+            #     sign conflict. Total elif-derived conflicts are
+            #     therefore exactly ``(#True_bool + #pos_num) * #neg_num``
+            #     — every pair in that cross-product is unordered (the
+            #     factor sets are disjoint) and none of those pairs is a
+            #     ``bool``-vs-``bool`` pair, so we don't double-count
+            #     against the first arm.
+            #
+            # ``total_pairs`` stays ``K * (K-1) / 2`` to keep the
+            # conflict-ratio denominator identical to before.
             beliefs = latest.beliefs
-            conflicts = 0
-            total_pairs = 0
-            keys = list(beliefs.keys())
-            for i in range(len(keys)):
-                for j in range(i + 1, len(keys)):
-                    total_pairs += 1
-                    v1 = beliefs[keys[i]]
-                    v2 = beliefs[keys[j]]
-                    # Simple heuristic: if two beliefs are boolean opposites or
-                    # numerically contradictory
-                    if isinstance(v1, bool) and isinstance(v2, bool) and v1 != v2:
-                        conflicts += 1
-                    elif isinstance(v1, (int, float)) and isinstance(v2, (int, float)):
-                        if (v1 > 0 and v2 < 0) or (v1 < 0 and v2 > 0):
-                            conflicts += 1
+            n_keys = len(beliefs)
+            total_pairs = n_keys * (n_keys - 1) // 2
+            n_true = 0
+            n_false = 0
+            n_pos_num = 0  # numeric, > 0, not bool
+            n_neg_num = 0  # numeric, < 0, not bool
+            for v in beliefs.values():
+                if isinstance(v, bool):
+                    if v:
+                        n_true += 1
+                    else:
+                        n_false += 1
+                elif isinstance(v, (int, float)):
+                    if v > 0:
+                        n_pos_num += 1
+                    elif v < 0:
+                        n_neg_num += 1
+                # Zero numerics and non-numeric values never contribute
+                # to a conflict but still occupy a slot in ``total_pairs``.
+            conflicts = (n_true * n_false) + ((n_true + n_pos_num) * n_neg_num)
             if total_pairs > 0:
                 conflict_ratio = conflicts / total_pairs
                 if conflict_ratio >= MISFOLDING_CONFLICT_THRESHOLD:
