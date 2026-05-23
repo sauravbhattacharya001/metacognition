@@ -406,33 +406,64 @@ class AuditEngine:
         for vid in vote_vectors:
             while len(vote_vectors[vid]) < max_len:
                 vote_vectors[vid].append(0)
-        # Check pairwise agreement
+        # Check pairwise agreement.
+        #
+        # Refactor notes:
+        #   * The previous implementation walked the zipped pair of vote
+        #     vectors twice per pair (once for ``agreements``, once for
+        #     ``comparisons``) and re-checked the ``x != 0`` predicate
+        #     in each pass. Collusion detection runs on every audit, the
+        #     outer pair loop is already O(A**2), and each ``zip`` walk
+        #     allocates two generator frames — not catastrophic, but
+        #     wasteful and obscures the intent. The single-pass form
+        #     below also makes the contract obvious: ``comparisons`` is
+        #     the count of rounds where both agents actually voted,
+        #     and ``agreements`` is the subset of those where they voted
+        #     the same way.
+        #   * The ``MIN_COMPARISONS`` / ``COLLUSION_THRESHOLD`` numbers
+        #     are pulled out as named local constants instead of being
+        #     buried inline as ``5`` / ``0.9``; this matches how the
+        #     other ``_check_*`` helpers in this auditor name their
+        #     thresholds and makes the rule trivially auditable.
+        MIN_COMPARISONS = 5
+        COLLUSION_THRESHOLD = 0.9
         agent_list = sorted(vote_vectors.keys())
-        for i in range(len(agent_list)):
-            for j in range(i + 1, len(agent_list)):
-                a, b = agent_list[i], agent_list[j]
-                va, vb = vote_vectors[a], vote_vectors[b]
-                agreements = sum(
-                    1 for x, y in zip(va, vb) if x == y and x != 0
+        for i, a in enumerate(agent_list):
+            va = vote_vectors[a]
+            for b in agent_list[i + 1:]:
+                vb = vote_vectors[b]
+                agreements = 0
+                comparisons = 0
+                # Single pass: a round only counts toward ``comparisons``
+                # when both agents actually cast a vote (non-zero), and
+                # within that subset it counts toward ``agreements`` when
+                # the two vote weights match. Identical semantics to the
+                # original two-generator form.
+                for x, y in zip(va, vb):
+                    if x and y:
+                        comparisons += 1
+                        if x == y:
+                            agreements += 1
+                if comparisons < MIN_COMPARISONS:
+                    continue
+                agreement_rate = agreements / comparisons
+                if agreement_rate <= COLLUSION_THRESHOLD:
+                    continue
+                self.findings.append(
+                    AuditFinding(
+                        category="Potential Collusion",
+                        severity="MEDIUM",
+                        description=(
+                            f"Agents {a} and {b} agree {agreement_rate:.0%} "
+                            f"({agreements}/{comparisons} rounds)"
+                        ),
+                        evidence={
+                            "agents": [a, b],
+                            "agreement_rate": agreement_rate,
+                            "comparisons": comparisons,
+                        },
+                    )
                 )
-                comparisons = sum(
-                    1 for x, y in zip(va, vb) if x != 0 and y != 0
-                )
-                if comparisons >= 5:
-                    agreement_rate = agreements / comparisons
-                    if agreement_rate > 0.9:
-                        self.findings.append(
-                            AuditFinding(
-                                category="Potential Collusion",
-                                severity="MEDIUM",
-                                description=f"Agents {a} and {b} agree {agreement_rate:.0%} ({agreements}/{comparisons} rounds)",
-                                evidence={
-                                    "agents": [a, b],
-                                    "agreement_rate": agreement_rate,
-                                    "comparisons": comparisons,
-                                },
-                            )
-                        )
 
     def _check_commit_rate(self) -> None:
         """Flag unusually high or low commit rates."""
