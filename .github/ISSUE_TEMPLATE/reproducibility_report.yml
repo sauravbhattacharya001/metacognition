@@ -1,0 +1,122 @@
+name: "Reproducibility report"
+description: A claim from the paper or docs does not reproduce on a clean checkout.
+title: "[repro] "
+labels: ["reproducibility", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when a result reported in the paper, the README, or the docs site
+        does not reproduce when you run the code yourself. This is the highest-value class of
+        issue we receive — please be precise about what you ran and what you observed.
+
+        If you suspect a bug rather than a reproducibility gap, the
+        [Bug report](?template=bug_report.yml) template is a better fit.
+
+  - type: input
+    id: claim
+    attributes:
+      label: Claim that does not reproduce
+      description: |
+        Quote or paraphrase the specific claim. Cite the paper section, the README line, or
+        the docs URL so a maintainer can find the original statement quickly.
+      placeholder: "paper §5.2: 'mBFT reaches consensus in ≤ 3 rounds with f = 1, n = 4 under crash faults'"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: What the claim says you should observe (numbers, plots, behaviour).
+      placeholder: |
+        - p50 rounds-to-commit: 2
+        - p99 rounds-to-commit: 3
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed result
+      description: What you actually saw. Paste raw numbers, log snippets, or attach a CSV.
+      render: text
+      placeholder: |
+        - p50 rounds-to-commit: 2
+        - p99 rounds-to-commit: 7  (over 10 000 trials, seed range 0..9999)
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction commands
+      description: |
+        Exact commands a maintainer can paste to reproduce your run. Include the seed range
+        and any non-default configuration. Smaller and more deterministic is better.
+      render: shell
+      placeholder: |
+        git checkout v1.7.2
+        pip install -e .
+        python -m src.benchmarks.consensus_rounds --n 4 --f 1 --trials 10000 --seed-range 0:10000
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: mBFT version / commit
+      description: "Output of `pip show mbft-consensus` or the commit SHA you're on."
+      placeholder: "1.7.2 (commit ce66778)"
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.12.2"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Ubuntu 24.04 / Windows 11 24H2 / macOS 14.5"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: gap_size
+    attributes:
+      label: Size of the gap
+      description: How far off is the observed result from the claim?
+      options:
+        - "Small (within noise — claim is qualitatively correct)"
+        - "Moderate (claim direction is right, magnitude is off)"
+        - "Large (claim does not hold)"
+        - "Unsure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Suspected cause (optional)
+      description: |
+        If you have a theory — a recent refactor, a change in default hyperparameters, a
+        platform difference, a missing dependency pin — share it. Maintainers will still
+        investigate independently, but a starting point helps.
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: I ran on a clean checkout (no local modifications).
+          required: true
+        - label: I used a fixed seed (or a documented seed range).
+          required: true
+        - label: I have searched existing issues and discussions for this claim.
+          required: true

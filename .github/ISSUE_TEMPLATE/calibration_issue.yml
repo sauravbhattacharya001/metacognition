@@ -1,0 +1,116 @@
+name: "Calibration issue"
+description: An agent or engine produces miscalibrated confidences (over/under-confident).
+title: "[calibration] "
+labels: ["calibration", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when the **calibration** of an agent or engine appears off — i.e.
+        the reported confidence does not track empirical correctness. Calibration drift is
+        a first-class concern in mBFT because consensus weighting depends on it.
+
+        If the issue is a hard crash or a clear-cut bug, prefer the
+        [Bug report](?template=bug_report.yml) template instead.
+
+  - type: dropdown
+    id: direction
+    attributes:
+      label: Direction of miscalibration
+      options:
+        - "Over-confident (confidence > empirical accuracy)"
+        - "Under-confident (confidence < empirical accuracy)"
+        - "Both (regime-dependent)"
+        - "Unsure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One- or two-sentence description of the calibration problem.
+      placeholder: |
+        Calibrator reports mean confidence 0.92 on a held-out task where empirical accuracy
+        is 0.71. ECE = 0.18, Brier = 0.22.
+    validations:
+      required: true
+
+  - type: textarea
+    id: metric
+    attributes:
+      label: Calibration metric(s)
+      description: |
+        Which calibration metric(s) did you measure, and what values did you get? Include the
+        bucket count for ECE, the loss for Brier, etc.
+      render: text
+      placeholder: |
+        ECE (15 buckets): 0.18
+        MCE:              0.34
+        Brier:            0.22
+        Log-loss:         0.61
+    validations:
+      required: true
+
+  - type: textarea
+    id: setup
+    attributes:
+      label: Engine / agent configuration
+      description: |
+        Which engine produced the miscalibrated output? List relevant hyperparameters,
+        agent counts, fault assumptions, and any non-default options.
+      render: yaml
+      placeholder: |
+        engine: calibrator
+        n_agents: 8
+        f: 2
+        temperature: 1.0
+        history_window: 256
+        recalibration: platt
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Code or commands that produce the miscalibrated output. Seed everything.
+      render: python
+      placeholder: |
+        import random, numpy as np
+        random.seed(0); np.random.seed(0)
+        from src.calibrator import Calibrator
+        c = Calibrator(history_window=256)
+        # ... feed N (prediction, outcome) pairs, then ...
+        print(c.report())
+    validations:
+      required: true
+
+  - type: input
+    id: dataset
+    attributes:
+      label: Dataset / workload
+      description: "What did you evaluate against? Synthetic, a benchmark from `tests/`, your own data?"
+      placeholder: "tests/data/consensus_traces_v1.parquet (10 000 rounds, mixed fault profile)"
+
+  - type: input
+    id: version
+    attributes:
+      label: mBFT version / commit
+      placeholder: "1.7.2 (commit ce66778)"
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.12.2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context
+      description: Reliability diagrams, calibration plots, or anything else that helps.
